@@ -68,7 +68,11 @@
   .ledger td.saldo.neg{color:var(--red)}
   .ledger .det{color:var(--ink-2);font-size:.85rem;display:block}
   .ledger .tag{font-size:.78rem;padding:1px 6px;border-radius:3px;background:var(--paper-2);white-space:nowrap}
-  .ledger .del{background:none;border:0;color:var(--ink-2);cursor:pointer;padding:0 4px;font-size:1rem;line-height:1}
+  .ledger .del,.ledger .edit{background:none;border:0;color:var(--ink-2);cursor:pointer;padding:0 4px;font-size:1rem;line-height:1}
+  .ledger .edit:hover{color:var(--blue)}
+  .editando{background:var(--green-soft);border:1px solid var(--green);border-radius:var(--r);padding:8px 12px;font-size:.88rem;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .editando button{background:none;border:0;color:var(--green);cursor:pointer;text-decoration:underline;padding:0}
+  .ledger tr.sel td{background:var(--green-soft)}
   .ledger .del:hover{color:var(--red)}
   .empty{padding:36px 20px;text-align:center;color:var(--ink-2);background:#fff;border:1px dashed var(--line)}
   .wrap{overflow-x:auto}
@@ -141,7 +145,8 @@
 
 <main>
   <aside>
-    <h2>Nueva operación</h2>
+    <h2 id="asideTitle">Nueva operación</h2>
+    <div class="editando" id="editBanner" hidden><span>Editando un movimiento existente</span><button id="editCancel" type="button">Cancelar</button></div>
     <div class="tipos" id="tipos">
       <button data-t="compra" class="on">Compra de dólares<small>Le llevás pesos</small></button>
       <button data-t="tarjeta">Cobro con posnet<small>Tarjeta en cuotas</small></button>
@@ -460,14 +465,52 @@ $('#btnAdd').addEventListener('click', async () => {
   const grupo = r.movs.length>1 ? String(Date.now()) : null;
   const rows = r.movs.map(m => ({ fecha, tipo, detalle:r.detalle, moneda:m.moneda, debe:+m.debe.toFixed(2), haber:+m.haber.toFixed(2), meta:{...r.meta, ...(grupo?{grupo}:{})}, creado_por:user.id }));
   $('#btnAdd').disabled = true;
+  if(editando){
+    const del = editando.meta?.grupo ? sb.from('movimientos').delete().eq('meta->>grupo', editando.meta.grupo) : sb.from('movimientos').delete().eq('id', editando.id);
+    const { error: e1 } = await del;
+    if(e1){ $('#btnAdd').disabled = false; toast('No se pudo actualizar: ' + e1.message); return; }
+  }
   const { error } = await sb.from('movimientos').insert(rows);
   $('#btnAdd').disabled = false;
   if(error){ toast('No se pudo registrar: ' + error.message); return; }
   if(r.meta.cot){ state.config.lastCot = r.meta.cot; guardarConfig(); }
-  toast('Operación registrada');
+  toast(editando ? 'Movimiento actualizado' : 'Operación registrada');
+  terminarEdicion(false);
   ['#c-pesos','#t-pesos','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-det'].forEach(s=>$(s).value='');
   limpiarComprobante(); renderPreview(); cargar();
 });
+
+// ---------- edición ----------
+let editando = null;
+function setTipo(t){
+  tipo = t;
+  document.querySelectorAll('#tipos button').forEach(x=>x.classList.toggle('on', x.dataset.t===t));
+  TIPOS.forEach(x => $('#f-'+x).hidden = x!==t);
+}
+function empezarEdicion(o){
+  const m = o.meta || {};
+  editando = o;
+  setTipo(o.tipo);
+  $('#fecha').value = o.fecha;
+  const put = (id,v) => { $(id).value = (v===undefined||v===null) ? '' : v; };
+  if(o.tipo==='compra'){ put('#c-pesos',m.pesos); put('#c-cot',m.cot); $('#c-origen').value = m.origen||'llevo'; }
+  if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); }
+  if(o.tipo==='entrega'){ put('#e-usd',o.haber); put('#e-det',m.det); }
+  if(o.tipo==='usdt'){ put('#u-usd',m.usd); put('#u-pct',m.pct); put('#u-prov',m.prov); }
+  if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
+    $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot',m.cot); put('#tr-pct',m.pct);
+    compActual = m.comprobante ? {path:m.comprobante} : null; $('#dropPrev').innerHTML=''; $('#ocrStatus').textContent = m.comprobante ? 'Se conserva el comprobante ya guardado.' : ''; }
+  if(o.tipo==='ajuste'){ put('#a-usd', o.haber ? o.haber : -o.debe); $('#a-mon').value = o.moneda||'USD'; put('#a-det',m.det); }
+  $('#asideTitle').textContent = 'Editar operación'; $('#editBanner').hidden = false; $('#btnAdd').textContent = 'Guardar cambios';
+  renderPreview(); render();
+  document.querySelector('aside').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function terminarEdicion(limpiar=true){
+  editando = null;
+  $('#asideTitle').textContent = 'Nueva operación'; $('#editBanner').hidden = true; $('#btnAdd').textContent = 'Registrar operación';
+  if(limpiar){ ['#c-pesos','#t-pesos','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-det'].forEach(s=>$(s).value=''); limpiarComprobante(); $('#fecha').value = today(); renderPreview(); render(); }
+}
+$('#editCancel').addEventListener('click', ()=>terminarEdicion(true));
 
 // ---------- render ----------
 function ordenar(ops){ return [...ops].sort((a,b)=> a.fecha===b.fecha ? a.id-b.id : a.fecha.localeCompare(b.fecha)); }
@@ -499,14 +542,14 @@ function render(){
     return;
   }
   const rows = [...vis].reverse().map(o => `
-    <tr>
+    <tr class="${editando && (o.id===editando.id || (o.meta?.grupo && o.meta.grupo===editando.meta?.grupo))?'sel':''}">
       <td class="num">${fmtFecha(o.fecha)}</td>
       <td><span class="tag">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}</span></td>
       <td class="n num debe">${o.debe?fmtMon(o.moneda,o.debe):''}</td>
       <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):''}</td>
       <td class="n num saldo ${saldoUSD[o.id]<0?'neg':''}">${fmtUSD(saldoUSD[o.id])}</td>
       ${hayArs?`<td class="n num saldo ${saldoARS[o.id]<0?'neg':''}">${fmtARS(saldoARS[o.id])}</td>`:''}
-      <td><button class="del" data-id="${o.id}" title="Eliminar">×</button></td>
+      <td style="white-space:nowrap"><button class="edit" data-id="${o.id}" title="Editar">✎</button><button class="del" data-id="${o.id}" title="Eliminar">×</button></td>
     </tr>`).join('');
   $('#ledgerWrap').innerHTML = `<table class="ledger">
     <thead><tr><th>Fecha</th><th>Operación</th><th class="n">Debe</th><th class="n">Haber</th><th class="n">Saldo USD</th>${hayArs?'<th class="n">Saldo ARS</th>':''}<th></th></tr></thead>
@@ -517,6 +560,8 @@ $('#ledgerWrap').addEventListener('click', async e => {
   const a = e.target.closest('.adj');
   if(a){ e.preventDefault(); const { data, error } = await sb.storage.from('comprobantes').createSignedUrl(a.dataset.path, 300);
     if(error){ toast('No se pudo abrir el comprobante: ' + error.message); return; } window.open(data.signedUrl, '_blank'); return; }
+  const ed = e.target.closest('.edit');
+  if(ed){ const o = state.ops.find(x=>x.id==ed.dataset.id); if(o) empezarEdicion(o); return; }
   const b = e.target.closest('.del'); if(!b) return;
   const o = state.ops.find(x=>x.id==b.dataset.id);
   if(!o || !confirm(`¿Eliminar "${NOMBRE[o.tipo]} · ${o.detalle}"?`)) return;
