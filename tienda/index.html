@@ -1921,4 +1921,6 @@ function cerrarModal(){document.getElementById('modal').classList.remove('vis');
 </script>
 
 
+<a id="volverFarroyo" href="../#cuenta" style="position:fixed;top:10px;left:10px;z-index:99999;background:#1B2A22;color:#fff;font:600 14px system-ui,sans-serif;padding:8px 14px;border-radius:6px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25)">← Volver a Cuenta Corriente</a>
+<script>document.getElementById('volverFarroyo').addEventListener('click',function(e){ if(window.parent!==window){ e.preventDefault(); window.parent.postMessage({farroyo:'cuenta'},'*'); } });</script>
 </body></html>
