@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Farroyo Store Generator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0a0a0f;--surf:#13131a;--surf2:#1c1c28;--surf3:#1e1e2e;--bord:rgba(255,255,255,0.07);--bord2:rgba(167,139,250,0.2);--acc:#7c3aed;--acc2:#a78bfa;--acc3:#6d28d9;--txt:#f0f0ff;--mut:#6b6b8a;--mut2:#8b8ba8;--ok:#10b981;--warn:#f59e0b}
@@ -300,6 +301,7 @@ h1{font-family:'Syne',sans-serif;font-size:44px;font-weight:800;letter-spacing:-
     <span id="img-size-lbl" style="font-size:13px;color:var(--txt);min-width:40px;text-align:right">110px</span>
   </div>
 
+  <div id="nube-estado" style="font-size:12px;color:var(--mut);margin-bottom:8px">☁ Conectando con la nube…</div>
   <div id="imgs-list" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;padding-right:4px">
     <div style="text-align:center;color:var(--mut);font-size:13px;padding:20px">Subí un CSV y apretá "Generar lista desde CSV" para ver los modelos aquí.</div>
   </div>
@@ -454,16 +456,99 @@ function imgKey(nombre, sub){
   return prod + '::' + n + '|' + s;
 }
 
+// Busca la imagen de un modelo. Si no hay una exacta (sección + modelo + capacidad),
+// usa la del mismo modelo en otra capacidad, y si no, la del mismo modelo en otra sección.
+function buscarImg(k){
+  if(imgsModelos[k]) return imgsModelos[k];
+  var m = k.match(/^(.*?)::(.*?)\|(.*)$/); if(!m) return null;
+  var prod = m[1], n = m[2], keys = Object.keys(imgsModelos), i;
+  for(i=0;i<keys.length;i++){ if(keys[i].indexOf(prod+'::'+n+'|')===0) return imgsModelos[keys[i]]; }
+  for(i=0;i<keys.length;i++){ var mm = keys[i].match(/^(.*?)::(.*?)\|/); if(mm && mm[2]===n) return imgsModelos[keys[i]]; }
+  return null;
+}
+
+// ── Nube (Supabase): las imágenes se guardan en la cuenta compartida y quedan para siempre ──
+var SB_URL = 'https://dyzwgtvilvayihouvwxt.supabase.co';
+var SB_KEY = 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd';
+var sbImg = (window.supabase && supabase.createClient) ? supabase.createClient(SB_URL, SB_KEY) : null;
+var _imgsRemoto = {}; var _nubeLista = false;
+
+function estadoNube(txt, err){
+  var el = document.getElementById('nube-estado'); if(!el) return;
+  el.textContent = txt; el.style.color = err ? '#e06c5c' : 'var(--mut)';
+}
+
+async function cargarImgsNube(){
+  if(!sbImg) return;
+  var ses = (await sbImg.auth.getSession()).data.session;
+  if(!ses){ mostrarLoginImgs(); return; }
+  var r = await sbImg.from('imagenes_modelos').select('key,data');
+  if(r.error){ estadoNube('No se pudo conectar con la nube: '+r.error.message, true); return; }
+  _imgsRemoto = {}; r.data.forEach(function(x){ _imgsRemoto[x.key] = x.data; });
+  // La nube manda; lo que sólo esté en este navegador se sube.
+  var locales = imgsModelos; imgsModelos = Object.assign({}, locales, _imgsRemoto);
+  _nubeLista = true;
+  try{ localStorage.setItem('farroyo_imgs_modelos', JSON.stringify(imgsModelos)); }catch(e){}
+  estadoNube('☁ '+Object.keys(imgsModelos).length+' imágenes guardadas en la nube ('+ses.user.email+')');
+  var faltan = Object.keys(locales).filter(function(k){ return !_imgsRemoto[k]; });
+  if(faltan.length) sincronizarImgs();
+  if(window._ultimosItemsImgs) renderImgsList(window._ultimosItemsImgs);
+}
+
+var _syncTimer = null;
+function sincronizarImgs(){
+  if(!sbImg || !_nubeLista) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async function(){
+    var subir = [], borrar = [];
+    Object.keys(imgsModelos).forEach(function(k){ if(_imgsRemoto[k]!==imgsModelos[k]) subir.push({key:k, data:imgsModelos[k], actualizado:new Date().toISOString()}); });
+    Object.keys(_imgsRemoto).forEach(function(k){ if(!imgsModelos[k]) borrar.push(k); });
+    if(!subir.length && !borrar.length) return;
+    estadoNube('☁ Guardando en la nube…');
+    var err = null;
+    for(var i=0;i<subir.length && !err;i+=20){ var r = await sbImg.from('imagenes_modelos').upsert(subir.slice(i,i+20)); if(r.error) err = r.error; }
+    if(!err && borrar.length){ var d = await sbImg.from('imagenes_modelos').delete().in('key', borrar); if(d.error) err = d.error; }
+    if(err){ estadoNube('⚠ No se pudo guardar en la nube: '+err.message, true); return; }
+    subir.forEach(function(x){ _imgsRemoto[x.key] = x.data; }); borrar.forEach(function(k){ delete _imgsRemoto[k]; });
+    estadoNube('☁ '+Object.keys(imgsModelos).length+' imágenes guardadas en la nube');
+  }, 400);
+}
+
+function mostrarLoginImgs(){
+  if(document.getElementById('login-imgs')) return;
+  var d = document.createElement('div'); d.id = 'login-imgs';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px';
+  d.innerHTML = '<form style="background:#1c1c1e;color:#fff;border-radius:12px;padding:24px;max-width:340px;width:100%;font-family:system-ui,sans-serif">'+
+    '<div style="font-size:18px;font-weight:700;margin-bottom:4px">Ingresá para usar tus imágenes</div>'+
+    '<div style="font-size:13px;opacity:.7;margin-bottom:14px">Es el mismo usuario de la Cuenta Corriente. Así las fotos de los modelos quedan guardadas y las ven los dos.</div>'+
+    '<input id="li-email" type="email" placeholder="Email" required style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #444;background:#111;color:#fff;margin-bottom:8px">'+
+    '<input id="li-pass" type="password" placeholder="Contraseña" required style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #444;background:#111;color:#fff;margin-bottom:8px">'+
+    '<div id="li-err" style="color:#e06c5c;font-size:13px;min-height:1.2em;margin-bottom:8px"></div>'+
+    '<button type="submit" style="width:100%;padding:11px;border-radius:8px;border:0;background:#fff;color:#000;font-weight:700;cursor:pointer">Entrar</button>'+
+    '<button type="button" id="li-skip" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;border:1px solid #444;background:transparent;color:#aaa;cursor:pointer">Seguir sin guardar en la nube</button>'+
+    '</form>';
+  document.body.appendChild(d);
+  d.querySelector('form').addEventListener('submit', async function(e){
+    e.preventDefault();
+    var r = await sbImg.auth.signInWithPassword({ email:document.getElementById('li-email').value.trim(), password:document.getElementById('li-pass').value });
+    if(r.error){ document.getElementById('li-err').textContent = 'Email o contraseña incorrectos.'; return; }
+    d.remove(); cargarImgsNube();
+  });
+  document.getElementById('li-skip').addEventListener('click', function(){ d.remove(); estadoNube('Sin conexión a la nube: las imágenes sólo quedan en este navegador.', true); });
+}
+
 function guardarImgsModelos(){
-  try {
-    localStorage.setItem('farroyo_imgs_modelos', JSON.stringify(imgsModelos));
-    return true;
-  } catch(e) {
-    console.warn('No se pudo guardar imágenes (localStorage lleno?)', e);
-    alert('⚠ No se pudieron guardar las imágenes: el almacenamiento del navegador está lleno.\n\nProbá borrar imágenes de otras secciones (botón 🗑 Todo) o usá imágenes más chicas.');
+  var okLocal = true;
+  try { localStorage.setItem('farroyo_imgs_modelos', JSON.stringify(imgsModelos)); }
+  catch(e) { okLocal = false; console.warn('localStorage lleno; se guarda sólo en la nube', e); }
+  sincronizarImgs();
+  if(!okLocal && !_nubeLista){
+    alert('⚠ El almacenamiento del navegador está lleno y no hay conexión a la nube. Ingresá con tu usuario para que las imágenes se guarden.');
     return false;
   }
+  return true;
 }
+window.addEventListener('load', function(){ setTimeout(cargarImgsNube, 300); });
 
 function procesarImgArchivo(file, cb, maxSize){
   var MAX = maxSize || 300;
@@ -496,7 +581,7 @@ function renderImgsList(items){
   var tot = items.length, con = 0;
   items.forEach(function(it){
     var k = imgKey(it.n, it.sub || it.mem || '');
-    if(imgsModelos[k]) con++;
+    if(buscarImg(k)) con++;
   });
   var nombreSec = (prodActivo && prodActivo.nm) ? prodActivo.nm : 'sección actual';
   var pct = tot > 0 ? Math.round(con*100/tot) : 0;
@@ -512,12 +597,12 @@ function renderImgsList(items){
     '</div>';
   items.forEach(function(it){
     var k = imgKey(it.n, it.sub || it.mem || '');
-    var tieneImg = !!imgsModelos[k];
+    var tieneImg = !!buscarImg(k);
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;background:var(--surf2);border:1px solid var(--bord);border-radius:10px';
     row.innerHTML =
       '<div style="width:50px;height:50px;border-radius:8px;background:#0a0a0f;border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0" id="prev-'+k.replace(/[^a-z0-9]/gi,'_')+'">'+
-        (tieneImg ? '<img src="'+imgsModelos[k]+'" style="max-width:100%;max-height:100%;object-fit:contain">' : '<span style="font-size:20px;opacity:0.3">📷</span>')+
+        (tieneImg ? '<img src="'+buscarImg(k)+'" style="max-width:100%;max-height:100%;object-fit:contain">' : '<span style="font-size:20px;opacity:0.3">📷</span>')+
       '</div>'+
       '<div style="flex:1;min-width:0">'+
         '<div style="font-size:13px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+it.n+'</div>'+
@@ -593,7 +678,7 @@ function renderImgsList(items){
   cont.querySelectorAll('button[data-copyallkey]').forEach(function(btn){
     btn.onclick = function(){
       var k = btn.dataset.copyallkey;
-      var src = imgsModelos[k];
+      var src = buscarImg(k);
       if(!src) return;
       if(!confirm('¿Aplicar esta imagen a los '+items.length+' modelos de "'+nombreSec+'"?\n\n(Se reemplazan las imágenes que ya tenías cargadas en esta sección)')) return;
       items.forEach(function(it){
@@ -1607,7 +1692,7 @@ function buildHTML(prodId,items,parte,total,d){
     var imgsActivas = document.getElementById('imgs-on') && document.getElementById('imgs-on').checked;
     var imgSize = parseInt((document.getElementById('img-size')||{}).value) || 110;
     var imgK = imgKey(item.n, item.sub || item.mem || '');
-    var imgSrc = imgsModelos[imgK];
+    var imgSrc = buscarImg(imgK);
     var imgHTML = '';
     var nomCol = '1fr';
     if(imgsActivas && imgSrc){
@@ -1677,7 +1762,7 @@ function buildHTMLBaterias(items,parte,total,d,prodId){
     var imgsActivasB = document.getElementById('imgs-on') && document.getElementById('imgs-on').checked;
     var imgSizeB = parseInt((document.getElementById('img-size')||{}).value) || 110;
     var imgKB = imgKey(item.n, '');
-    var imgSrcB = imgsModelos[imgKB];
+    var imgSrcB = buscarImg(imgKB);
     var imgHTMLB = '';
     if(imgsActivasB && imgSrcB){
       imgHTMLB = '<div style="width:'+imgSizeB+'px;height:'+imgSizeB+'px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:14px"><img src="'+imgSrcB+'" style="max-width:100%;max-height:100%;object-fit:contain"></div>';
