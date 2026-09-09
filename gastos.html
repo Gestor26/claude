@@ -117,9 +117,9 @@
 </header>
 
 <div class="resumen">
-  <div><div class="k" id="rMesK">Este mes</div><div class="v num" id="rMes">ARS 0</div><div class="barra" id="rBarra" hidden><i></i></div><div class="k" id="rPres"></div></div>
-  <div><div class="k">Personal</div><div class="v num" id="rPers">ARS 0</div><div class="k num" id="rPersPct"></div></div>
-  <div><div class="k">Farroyo</div><div class="v num" id="rFarr">ARS 0</div><div class="k num" id="rFarrPct"></div></div>
+  <div><div class="k" id="rPesosK">Gastado en pesos total</div><div class="v num" id="rPesos">ARS 0</div></div>
+  <div><div class="k" id="rUsdK">Gastado en USD total</div><div class="v num" id="rUsd">USD 0,00</div></div>
+  <div><div class="k" id="rMesK">Todo junto en pesos</div><div class="v num" id="rMes">ARS 0</div><div class="barra" id="rBarra" hidden><i></i></div><div class="k" id="rPres"></div></div>
   <div><div class="k">Hoy</div><div class="v num" id="rHoy">ARS 0</div></div>
   <div><div class="k">Promedio por día este mes</div><div class="v num" id="rProm">ARS 0</div></div>
   <div><div class="k">Mes anterior</div><div class="v num" id="rAnt">ARS 0</div></div>
@@ -301,17 +301,18 @@ $('#editCancel').addEventListener('click', terminarEdicion);
 
 // ---------- render ----------
 function render(){
-  const gs = state.gastos, t = today(), mesAct = t.slice(0,7);
+  const fa=$('#fAmb').value, gs = fa ? state.gastos.filter(g=>g.ambito===fa) : state.gastos, t = today(), mesAct = t.slice(0,7);
   const suma = arr => arr.reduce((s,g)=>s+enARS(g),0);
   const hoy = gs.filter(g=>g.fecha===t), mes = gs.filter(g=>g.fecha.startsWith(mesVista));
+  const sufijo = fa ? ` · ${fa}` : '';
+  $('#rPesos').textContent = fmtARS(mes.filter(g=>g.moneda!=='USD').reduce((s,g)=>s+g.monto,0));
+  $('#rUsd').textContent = fmtUSD(mes.filter(g=>g.moneda==='USD').reduce((s,g)=>s+g.monto,0));
+  $('#rPesosK').textContent = 'Gastado en pesos' + sufijo; $('#rUsdK').textContent = 'Gastado en USD' + sufijo;
   const antYM = (()=>{ const d=new Date(mesVista+'-15'); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7); })();
   const ant = gs.filter(g=>g.fecha.startsWith(antYM));
   $('#rHoy').textContent = fmtARS(suma(hoy));
-  $('#rMesK').textContent = mesVista===mesAct ? 'Este mes' : nombreMes(mesVista);
+  $('#rMesK').textContent = 'Todo junto en pesos' + (state.config.cot ? '' : ' (sin cotización, USD no se suma)');
   const totMes = suma(mes); $('#rMes').textContent = fmtARS(totMes);
-  const tP = suma(mes.filter(g=>g.ambito!=='Farroyo')), tF = suma(mes.filter(g=>g.ambito==='Farroyo'));
-  $('#rPers').textContent = fmtARS(tP); $('#rFarr').textContent = fmtARS(tF);
-  $('#rPersPct').textContent = totMes ? Math.round(tP/totMes*100)+'% del mes' : ''; $('#rFarrPct').textContent = totMes ? Math.round(tF/totMes*100)+'% del mes' : '';
   const dias = mesVista===mesAct ? +t.slice(8) : new Date(+mesVista.slice(0,4), +mesVista.slice(5), 0).getDate();
   $('#rProm').textContent = fmtARS(mes.length ? totMes/dias : 0);
   $('#rAnt').textContent = fmtARS(suma(ant));
@@ -321,14 +322,14 @@ function render(){
   $('#mesTxt').textContent = nombreMes(mesVista);
 
   // por categoría
-  const faC=$('#fAmb').value, mesA = faC ? mes.filter(g=>g.ambito===faC) : mes, totA = suma(mesA);
+  const mesA = mes, totA = totMes;
   const porCat = {}; mesA.forEach(g => porCat[g.categoria] = (porCat[g.categoria]||0) + enARS(g));
   const ordCat = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
   $('#porCat').innerHTML = ordCat.map(([c,v]) => `<div><div class="n"><span>${esc(c)}</span><span class="num">${fmtARS(v)} <span style="color:var(--ink-2)">${totA?Math.round(v/totA*100):0}%</span></span></div><div class="barra"><i style="width:${totA?v/totA*100:0}%"></i></div></div>`).join('');
 
   // lista
-  const fc=$('#fCat').value, fx=$('#fTxt').value.trim().toLowerCase(), fa=$('#fAmb').value;
-  const vis = mes.filter(g => (!fa||g.ambito===fa) && (!fc||g.categoria===fc) && (!fx||g.detalle.toLowerCase().includes(fx)||g.categoria.toLowerCase().includes(fx)));
+  const fc=$('#fCat').value, fx=$('#fTxt').value.trim().toLowerCase();
+  const vis = mes.filter(g => (!fc||g.categoria===fc) && (!fx||g.detalle.toLowerCase().includes(fx)||g.categoria.toLowerCase().includes(fx)));
   if(!vis.length){ $('#lista').innerHTML = `<div class="empty">${mes.length?'Ningún gasto coincide con el filtro.':'Sin gastos en este mes.'}</div>`; return; }
   const porDia = {}; vis.forEach(g => (porDia[g.fecha] = porDia[g.fecha]||[]).push(g));
   $('#lista').innerHTML = Object.keys(porDia).sort().reverse().map(f => `
