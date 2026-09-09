@@ -358,7 +358,7 @@ const SUPABASE_KEY = 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CUOTAS = [1,3,6,9,12,18,24];
-const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, lastCotCli:null, cuotas:{1:1,3:1,6:1,9:1,12:1,18:1,24:1}, recargos:{1:0,3:0,6:0,9:0,12:0,18:0,24:0}, lastCot:null };
+const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, lastCotCli:null, cuotas:{1:1,3:1.28,6:1.35,9:1.48,12:1.48,18:1,24:1}, recargos:{1:0,3:45,6:55,9:75,12:90,18:0,24:0}, lastCot:null };
 let state = { config:{...DEFAULT_CFG, cuotas:{...DEFAULT_CFG.cuotas}}, ops:[] };
 let user = null;
 
@@ -407,6 +407,10 @@ async function cargar(){
   state.ops = m.data.map(r => ({ id:r.id, fecha:r.fecha, tipo:r.tipo, detalle:r.detalle||'', moneda:r.moneda||'USD', debe:+r.debe||0, haber:+r.haber||0, meta:r.meta||{}, por:r.creado_por }));
   const d = c.data?.data || {};
   state.config = { ...DEFAULT_CFG, ...d, cuotas:{...DEFAULT_CFG.cuotas, ...(d.cuotas||{})}, recargos:{...DEFAULT_CFG.recargos, ...(d.recargos||{})} };
+  // Completar con los valores por defecto los planes que todavía no se configuraron
+  let cambio = false;
+  [3,6,9,12].forEach(c => { if(!state.config.cuotas[c] || state.config.cuotas[c]===1){ state.config.cuotas[c] = DEFAULT_CFG.cuotas[c]; cambio = true; } if(!state.config.recargos[c]){ state.config.recargos[c] = DEFAULT_CFG.recargos[c]; cambio = true; } });
+  if(cambio) guardarConfig();
   fillDefaults(); renderPreview(); render();
 }
 async function guardarConfig(){
