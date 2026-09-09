@@ -357,8 +357,8 @@ const SUPABASE_URL = 'https://dyzwgtvilvayihouvwxt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const CUOTAS = [1,3,6,12,18,24];
-const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, lastCotCli:null, cuotas:{1:1,3:1,6:1,12:1,18:1,24:1}, recargos:{1:0,3:0,6:0,12:0,18:0,24:0}, lastCot:null };
+const CUOTAS = [1,3,6,9,12,18,24];
+const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, lastCotCli:null, cuotas:{1:1,3:1,6:1,9:1,12:1,18:1,24:1}, recargos:{1:0,3:0,6:0,9:0,12:0,18:0,24:0}, lastCot:null };
 let state = { config:{...DEFAULT_CFG, cuotas:{...DEFAULT_CFG.cuotas}}, ops:[] };
 let user = null;
 
