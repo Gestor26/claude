@@ -73,6 +73,16 @@
   .editando{background:var(--green-soft);border:1px solid var(--green);border-radius:var(--r);padding:8px 12px;font-size:.88rem;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
   .editando button{background:none;border:0;color:var(--green);cursor:pointer;text-decoration:underline;padding:0}
   .ledger tr.sel td{background:var(--green-soft)}
+  .ledger tr.pend td{color:var(--ink-2)} .ledger tr.pend td.haber{color:var(--ink-2);font-style:italic}
+  .pend{background:#fff;border:1px solid var(--line);border-left:4px solid #C98A1B;border-radius:var(--r);padding:12px 14px;margin:0 0 16px}
+  .pend h3{margin:0 0 8px;font-size:.95rem;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .pend h3 button{font-size:.8rem;background:none;border:1px solid var(--line);border-radius:var(--r);padding:4px 10px;cursor:pointer}
+  .pend ul{list-style:none;margin:0;padding:0}
+  .pend li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--paper-2);font-size:.9rem}
+  .pend li:first-child{border-top:0}
+  .pend li .liq{background:var(--green);color:#fff;border:0;border-radius:var(--r);padding:5px 10px;cursor:pointer;font-size:.82rem;white-space:nowrap}
+  .pend .dias{color:var(--ink-2);font-size:.82rem}
+  .pend .dias.tarde{color:var(--red)}
   .ledger .del:hover{color:var(--red)}
   .empty{padding:36px 20px;text-align:center;color:var(--ink-2);background:#fff;border:1px dashed var(--line)}
   .wrap{overflow-x:auto}
@@ -307,6 +317,7 @@
       <input type="month" id="fMes">
       <input type="search" id="fTxt" placeholder="Buscar proveedor o detalle">
     </div>
+    <div id="pendBox"></div>
     <div class="totals" id="totals"></div>
     <div class="wrap" id="ledgerWrap"></div>
   </section>
@@ -468,7 +479,7 @@ function calc(){
     if(p>0 && c>0 && coef>0){ const neto=p/coef, usd=neto/c, base=p/(1+rec/100), gan=neto-base; r.ok=true;
       const det=$('#t-det').value.trim(), cs=coef.toLocaleString('es-AR',{maximumFractionDigits:4});
       r.detalle = `${q==='1'?'1 pago':q+' cuotas'} · ${fmtARS(p)} ÷ ${cs} a ${c.toLocaleString('es-AR')}${det?' · '+det:''}`;
-      r.meta={pesos:p,coef,cot:c,cuotas:+q,det,recargo:rec,ganARS:gan,ganUSD:gan/c}; r.movs.push({moneda:'USD',debe:0,haber:usd});
+      r.meta={pesos:p,coef,cot:c,cuotas:+q,det,recargo:rec,ganARS:gan,ganUSD:gan/c,pendiente:editando?!!editando.meta?.pendiente:true}; r.movs.push({moneda:'USD',debe:0,haber:usd});
       r.lines=[['Monto pasado',fmtARS(p)],[`÷ coeficiente ${cs}`,fmtARS(neto)],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']];
       if(rec>0) r.lines.splice(2,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',`${fmtARS(gan)} ≈ ${fmtUSD(gan/c)}`,'haber']); }
   }
@@ -571,6 +582,33 @@ function terminarEdicion(limpiar=true){
 }
 $('#editCancel').addEventListener('click', ()=>terminarEdicion(true));
 
+// ---------- pendientes de liquidación ----------
+function renderPendientes(all){
+  const pend = all.filter(o=>o.meta?.pendiente);
+  const box = $('#pendBox');
+  if(!pend.length){ box.innerHTML=''; return; }
+  const tot = pend.reduce((s,o)=>s+o.haber,0);
+  const hoy = new Date(today());
+  const items = pend.map(o => {
+    const d = Math.round((hoy - new Date(o.fecha))/86400000);
+    return `<li><span><b class="num">${fmtUSD(o.haber)}</b> <span style="color:var(--ink-2)">· ${fmtFecha(o.fecha)} · ${esc(o.detalle)}</span> <span class="dias ${d>4?'tarde':''}">${d===0?'hoy':d===1?'hace 1 día':'hace '+d+' días'}</span></span><button class="liq" data-id="${o.id}">✓ Liquidado</button></li>`;
+  }).join('');
+  box.innerHTML = `<div class="pend"><h3><span>Pendiente de liquidación: <span class="num">${fmtUSD(tot)}</span> <span style="color:var(--ink-2);font-weight:400">(${pend.length} ${pend.length===1?'cobro con tarjeta':'cobros con tarjeta'}, no suman al saldo todavía)</span></span><button id="liqTodo">Liquidar todo</button></h3><ul>${items}</ul></div>`;
+}
+async function liquidar(ids){
+  const ops = state.ops.filter(o=>ids.includes(o.id));
+  for(const o of ops){
+    const meta = {...o.meta, pendiente:false, liquidado:today()};
+    const { error } = await sb.from('movimientos').update({ meta }).eq('id', o.id);
+    if(error){ toast('No se pudo liquidar: ' + error.message); return; }
+  }
+  toast(ops.length===1 ? 'Cobro liquidado, ya suma al saldo' : `${ops.length} cobros liquidados`); cargar();
+}
+$('#pendBox').addEventListener('click', e => {
+  const b = e.target.closest('.liq'); if(b){ liquidar([+b.dataset.id]); return; }
+  if(e.target.closest('#liqTodo')){ const ids = state.ops.filter(o=>o.meta?.pendiente).map(o=>o.id); if(confirm(`¿Marcar ${ids.length} cobros como liquidados? Van a sumar al saldo.`)) liquidar(ids); }
+});
+
 // ---------- render ----------
 function ordenar(ops){ return [...ops].sort((a,b)=> a.fecha===b.fecha ? a.id-b.id : a.fecha.localeCompare(b.fecha)); }
 function fraseSaldo(el, mon, saldo){
@@ -582,7 +620,8 @@ function fraseSaldo(el, mon, saldo){
 function render(){
   const all = ordenar(state.ops);
   let usd = 0, ars = 0; const saldoUSD = {}, saldoARS = {};
-  all.forEach(o => { if(o.moneda==='ARS') ars += o.haber - o.debe; else usd += o.haber - o.debe; saldoUSD[o.id] = usd; saldoARS[o.id] = ars; });
+  all.forEach(o => { if(!o.meta?.pendiente){ if(o.moneda==='ARS') ars += o.haber - o.debe; else usd += o.haber - o.debe; } saldoUSD[o.id] = usd; saldoARS[o.id] = ars; });
+  renderPendientes(all);
   fraseSaldo($('#saldoTxt'), 'USD', usd);
   const hayArs = all.some(o=>o.moneda==='ARS');
   $('#saldoArs').hidden = !hayArs; if(hayArs) fraseSaldo($('#saldoArs'), 'ARS', ars);
@@ -590,7 +629,7 @@ function render(){
 
   const ft=$('#fTipo').value, fm=$('#fMes').value, fx=$('#fTxt').value.trim().toLowerCase();
   const vis = all.filter(o => (!ft||o.tipo===ft) && (!fm||o.fecha.startsWith(fm)) && (!fx||o.detalle.toLowerCase().includes(fx)));
-  const sum = (mon,k) => vis.filter(o=>o.moneda===mon).reduce((s,o)=>s+o[k],0);
+  const sum = (mon,k) => vis.filter(o=>o.moneda===mon && !o.meta?.pendiente).reduce((s,o)=>s+o[k],0);
   const partes = [];
   if(vis.some(o=>o.moneda==='USD')) partes.push(`<span>USD: acreditado <b class="num">${fmtUSD(sum('USD','haber'))}</b> · debitado <b class="num">${fmtUSD(sum('USD','debe'))}</b></span>`);
   if(vis.some(o=>o.moneda==='ARS')) partes.push(`<span>ARS: acreditado <b class="num">${fmtARS(sum('ARS','haber'))}</b> · debitado <b class="num">${fmtARS(sum('ARS','debe'))}</b></span>`);
@@ -605,9 +644,9 @@ function render(){
     return;
   }
   const rows = [...vis].reverse().map(o => `
-    <tr class="${editando && (o.id===editando.id || (o.meta?.grupo && o.meta.grupo===editando.meta?.grupo))?'sel':''}">
+    <tr class="${editando && (o.id===editando.id || (o.meta?.grupo && o.meta.grupo===editando.meta?.grupo))?'sel':''} ${o.meta?.pendiente?'pend':''}">
       <td class="num">${fmtFecha(o.fecha)}</td>
-      <td><span class="tag">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}${o.meta?.ganARS?` · <span style="color:var(--green)">ganancia ${fmtARS(o.meta.ganARS)}</span>`:''}</span></td>
+      <td><span class="tag">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.pendiente?'<span class="tag" style="background:#F6E7C8;color:#7A4E00;margin-left:4px">Pendiente</span>':''}${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}${o.meta?.ganARS?` · <span style="color:var(--green)">ganancia ${fmtARS(o.meta.ganARS)}</span>`:''}</span></td>
       <td class="n num debe">${o.debe?fmtMon(o.moneda,o.debe):''}</td>
       <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):''}</td>
       <td class="n num saldo ${saldoUSD[o.id]<0?'neg':''}">${fmtUSD(saldoUSD[o.id])}</td>
