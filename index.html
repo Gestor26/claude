@@ -39,6 +39,7 @@
   }
   document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) show(b.dataset.s); });
   if(ir==='tienda') show('tienda');
+  window.addEventListener('message', e=>{ if(e.data && e.data.farroyo) show(e.data.farroyo); });
 </script>
 </body>
 </html>
