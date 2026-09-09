@@ -117,8 +117,10 @@
 </header>
 
 <div class="resumen">
-  <div><div class="k">Hoy</div><div class="v num" id="rHoy">ARS 0</div></div>
   <div><div class="k" id="rMesK">Este mes</div><div class="v num" id="rMes">ARS 0</div><div class="barra" id="rBarra" hidden><i></i></div><div class="k" id="rPres"></div></div>
+  <div><div class="k">Personal</div><div class="v num" id="rPers">ARS 0</div><div class="k num" id="rPersPct"></div></div>
+  <div><div class="k">Farroyo</div><div class="v num" id="rFarr">ARS 0</div><div class="k num" id="rFarrPct"></div></div>
+  <div><div class="k">Hoy</div><div class="v num" id="rHoy">ARS 0</div></div>
   <div><div class="k">Promedio por día este mes</div><div class="v num" id="rProm">ARS 0</div></div>
   <div><div class="k">Mes anterior</div><div class="v num" id="rAnt">ARS 0</div></div>
 </div>
@@ -136,6 +138,11 @@
         <label for="g-mon">Moneda</label>
         <select id="g-mon"><option value="ARS">ARS</option><option value="USD">USD</option></select>
       </div>
+    </div>
+    <label>¿De quién es el gasto?</label>
+    <div class="chips" id="ambitos">
+      <button type="button" data-a="Personal" class="on">Personal</button>
+      <button type="button" data-a="Farroyo">Farroyo</button>
     </div>
     <label>Categoría</label>
     <div class="chips" id="cats"></div>
@@ -160,6 +167,7 @@
       <button id="mesPrev" title="Mes anterior">‹</button>
       <b id="mesTxt"></b>
       <button id="mesNext" title="Mes siguiente">›</button>
+      <select id="fAmb"><option value="">Personal + Farroyo</option><option>Personal</option><option>Farroyo</option></select>
       <select id="fCat"><option value="">Todas las categorías</option></select>
       <input type="search" id="fTxt" placeholder="Buscar">
     </div>
@@ -198,7 +206,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const CATS_DEF = ['Comida','Super','Transporte','Salidas','Casa','Servicios','Salud','Ropa','Auto','Regalos','Otros'];
 const DEFAULT_CFG = { presupuesto:null, cot:null, cats:CATS_DEF };
 let state = { config:{...DEFAULT_CFG}, gastos:[] };
-let user = null, cat = null, editando = null;
+let user = null, cat = null, editando = null, ambito = 'Personal';
 let mesVista = new Date().toISOString().slice(0,7);
 
 const $ = s => document.querySelector(s);
@@ -241,7 +249,7 @@ async function cargar(){
   ]);
   setLoading(false);
   if(g.error){ toast('Error al cargar: ' + g.error.message); return; }
-  state.gastos = g.data.map(r => ({ id:r.id, fecha:r.fecha, monto:+r.monto, moneda:r.moneda||'ARS', categoria:r.categoria||'Otros', detalle:r.detalle||'', medio:r.medio||'' }));
+  state.gastos = g.data.map(r => ({ id:r.id, fecha:r.fecha, monto:+r.monto, moneda:r.moneda||'ARS', categoria:r.categoria||'Otros', detalle:r.detalle||'', medio:r.medio||'', ambito:r.ambito||'Personal' }));
   const d = c.data?.data || {};
   state.config = { ...DEFAULT_CFG, ...d, cats: (d.cats && d.cats.length) ? d.cats : CATS_DEF };
   if(!cat || !state.config.cats.includes(cat)) cat = state.config.cats[0];
@@ -258,12 +266,14 @@ function renderCats(){
   $('#fCat').innerHTML = '<option value="">Todas las categorías</option>' + state.config.cats.map(c=>`<option>${esc(c)}</option>`).join('');
 }
 $('#cats').addEventListener('click', e => { const b=e.target.closest('button'); if(!b) return; cat=b.dataset.c; renderCats(); });
+function renderAmbito(){ document.querySelectorAll('#ambitos button').forEach(b=>b.classList.toggle('on', b.dataset.a===ambito)); }
+$('#ambitos').addEventListener('click', e => { const b=e.target.closest('button'); if(!b) return; ambito=b.dataset.a; renderAmbito(); });
 $('#g-fecha').value = today();
 
 $('#btnAdd').addEventListener('click', async () => {
   const monto = num('#g-monto');
   if(monto<=0){ toast('Poné el monto.'); $('#g-monto').focus(); return; }
-  const row = { fecha:$('#g-fecha').value||today(), monto, moneda:$('#g-mon').value, categoria:cat, detalle:$('#g-det').value.trim(), medio:$('#g-medio').value, user_id:user.id };
+  const row = { fecha:$('#g-fecha').value||today(), monto, moneda:$('#g-mon').value, categoria:cat, detalle:$('#g-det').value.trim(), medio:$('#g-medio').value, ambito, user_id:user.id };
   $('#btnAdd').disabled = true;
   const q = editando ? sb.from('gastos').update(row).eq('id', editando.id) : sb.from('gastos').insert(row);
   const { error } = await q;
@@ -276,7 +286,7 @@ $('#g-monto').addEventListener('keydown', e => { if(e.key==='Enter') $('#btnAdd'
 $('#g-det').addEventListener('keydown', e => { if(e.key==='Enter') $('#btnAdd').click(); });
 
 function empezarEdicion(g){
-  editando = g; cat = g.categoria; renderCats();
+  editando = g; cat = g.categoria; renderCats(); ambito = g.ambito||'Personal'; renderAmbito();
   $('#g-monto').value = g.monto; $('#g-mon').value = g.moneda; $('#g-det').value = g.detalle; $('#g-fecha').value = g.fecha; $('#g-medio').value = g.medio || 'Efectivo';
   $('#asideTitle').textContent = 'Editar gasto'; $('#editBanner').hidden = false; $('#btnAdd').textContent = 'Guardar cambios';
   document.querySelector('aside').scrollIntoView({behavior:'smooth', block:'start'});
@@ -298,6 +308,9 @@ function render(){
   $('#rHoy').textContent = fmtARS(suma(hoy));
   $('#rMesK').textContent = mesVista===mesAct ? 'Este mes' : nombreMes(mesVista);
   const totMes = suma(mes); $('#rMes').textContent = fmtARS(totMes);
+  const tP = suma(mes.filter(g=>g.ambito!=='Farroyo')), tF = suma(mes.filter(g=>g.ambito==='Farroyo'));
+  $('#rPers').textContent = fmtARS(tP); $('#rFarr').textContent = fmtARS(tF);
+  $('#rPersPct').textContent = totMes ? Math.round(tP/totMes*100)+'% del mes' : ''; $('#rFarrPct').textContent = totMes ? Math.round(tF/totMes*100)+'% del mes' : '';
   const dias = mesVista===mesAct ? +t.slice(8) : new Date(+mesVista.slice(0,4), +mesVista.slice(5), 0).getDate();
   $('#rProm').textContent = fmtARS(mes.length ? totMes/dias : 0);
   $('#rAnt').textContent = fmtARS(suma(ant));
@@ -307,24 +320,25 @@ function render(){
   $('#mesTxt').textContent = nombreMes(mesVista);
 
   // por categoría
-  const porCat = {}; mes.forEach(g => porCat[g.categoria] = (porCat[g.categoria]||0) + enARS(g));
+  const faC=$('#fAmb').value, mesA = faC ? mes.filter(g=>g.ambito===faC) : mes, totA = suma(mesA);
+  const porCat = {}; mesA.forEach(g => porCat[g.categoria] = (porCat[g.categoria]||0) + enARS(g));
   const ordCat = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
-  $('#porCat').innerHTML = ordCat.map(([c,v]) => `<div><div class="n"><span>${esc(c)}</span><span class="num">${fmtARS(v)} <span style="color:var(--ink-2)">${totMes?Math.round(v/totMes*100):0}%</span></span></div><div class="barra"><i style="width:${totMes?v/totMes*100:0}%"></i></div></div>`).join('');
+  $('#porCat').innerHTML = ordCat.map(([c,v]) => `<div><div class="n"><span>${esc(c)}</span><span class="num">${fmtARS(v)} <span style="color:var(--ink-2)">${totA?Math.round(v/totA*100):0}%</span></span></div><div class="barra"><i style="width:${totA?v/totA*100:0}%"></i></div></div>`).join('');
 
   // lista
-  const fc=$('#fCat').value, fx=$('#fTxt').value.trim().toLowerCase();
-  const vis = mes.filter(g => (!fc||g.categoria===fc) && (!fx||g.detalle.toLowerCase().includes(fx)||g.categoria.toLowerCase().includes(fx)));
+  const fc=$('#fCat').value, fx=$('#fTxt').value.trim().toLowerCase(), fa=$('#fAmb').value;
+  const vis = mes.filter(g => (!fa||g.ambito===fa) && (!fc||g.categoria===fc) && (!fx||g.detalle.toLowerCase().includes(fx)||g.categoria.toLowerCase().includes(fx)));
   if(!vis.length){ $('#lista').innerHTML = `<div class="empty">${mes.length?'Ningún gasto coincide con el filtro.':'Sin gastos en este mes.'}</div>`; return; }
   const porDia = {}; vis.forEach(g => (porDia[g.fecha] = porDia[g.fecha]||[]).push(g));
   $('#lista').innerHTML = Object.keys(porDia).sort().reverse().map(f => `
     <div class="dia"><h3><span>${nombreDia(f)}</span><span class="num">${fmtARS(suma(porDia[f]))}</span></h3>
     <table>${porDia[f].map(g => `<tr>
-      <td><span class="tag">${esc(g.categoria)}</span><span class="det">${esc(g.detalle)}${g.medio?` · ${esc(g.medio)}`:''}</span></td>
+      <td>${g.ambito==='Farroyo'?'<span class="tag" style="background:var(--green-soft);color:var(--green)">Farroyo</span>':''}<span class="tag">${esc(g.categoria)}</span><span class="det">${esc(g.detalle)}${g.medio?` · ${esc(g.medio)}`:''}</span></td>
       <td class="n num">${fmtMon(g.moneda,g.monto)}${g.moneda==='USD'&&state.config.cot?`<div class="det">≈ ${fmtARS(enARS(g))}</div>`:''}</td>
       <td class="a"><button class="ico edit" data-id="${g.id}" title="Editar">✎</button><button class="ico del" data-id="${g.id}" title="Eliminar">×</button></td>
     </tr>`).join('')}</table></div>`).join('');
 }
-['#fCat','#fTxt'].forEach(s => $(s).addEventListener('input', render));
+['#fCat','#fTxt','#fAmb'].forEach(s => $(s).addEventListener('input', render));
 $('#mesPrev').addEventListener('click', ()=>{ const d=new Date(mesVista+'-15'); d.setMonth(d.getMonth()-1); mesVista=d.toISOString().slice(0,7); render(); });
 $('#mesNext').addEventListener('click', ()=>{ const d=new Date(mesVista+'-15'); d.setMonth(d.getMonth()+1); mesVista=d.toISOString().slice(0,7); render(); });
 $('#lista').addEventListener('click', async e => {
@@ -358,8 +372,8 @@ $('#cfgSave').addEventListener('click', async () => {
 // ---------- CSV ----------
 $('#btnCSV').addEventListener('click', ()=> {
   const q = v => `"${String(v).replace(/"/g,'""')}"`;
-  const lines = [['Fecha','Categoría','Detalle','Pagado con','Moneda','Monto','En ARS'].join(';')];
-  [...state.gastos].sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(g => lines.push([g.fecha,q(g.categoria),q(g.detalle),g.medio,g.moneda,g.monto.toFixed(2).replace('.',','),Math.round(enARS(g))].join(';')));
+  const lines = [['Fecha','Ámbito','Categoría','Detalle','Pagado con','Moneda','Monto','En ARS'].join(';')];
+  [...state.gastos].sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(g => lines.push([g.fecha,g.ambito,q(g.categoria),q(g.detalle),g.medio,g.moneda,g.monto.toFixed(2).replace('.',','),Math.round(enARS(g))].join(';')));
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv'})); a.download = `gastos-${today()}.csv`; a.click(); URL.revokeObjectURL(a.href);
 });
 </script>
