@@ -253,8 +253,16 @@
         <option value="pct">En pesos, descontando un %</option>
       </select>
       <div id="tr-modo-cot">
-        <label for="tr-cot">Cotización (ARS por USD)</label>
-        <input type="number" id="tr-cot" inputmode="decimal" placeholder="1550" step="any">
+        <div class="row2">
+          <div>
+            <label for="tr-cot-cli">Tu cotización (al cliente)</label>
+            <input type="number" id="tr-cot-cli" inputmode="decimal" placeholder="1561" step="any">
+          </div>
+          <div>
+            <label for="tr-cot">Cotización de la financiera</label>
+            <input type="number" id="tr-cot" inputmode="decimal" placeholder="1585" step="any">
+          </div>
+        </div>
       </div>
       <div id="tr-modo-pct" hidden>
         <label for="tr-pct">Descuento %</label>
@@ -338,7 +346,7 @@ const SUPABASE_KEY = 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CUOTAS = [1,3,6,12,18,24];
-const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, cuotas:{1:1,3:1,6:1,12:1,18:1,24:1}, recargos:{1:0,3:0,6:0,12:0,18:0,24:0}, lastCot:null };
+const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, lastCotCli:null, cuotas:{1:1,3:1,6:1,12:1,18:1,24:1}, recargos:{1:0,3:0,6:0,12:0,18:0,24:0}, lastCot:null };
 let state = { config:{...DEFAULT_CFG, cuotas:{...DEFAULT_CFG.cuotas}}, ops:[] };
 let user = null;
 
@@ -417,6 +425,7 @@ function fillDefaults(){
     if(!$('#t-cot').value) $('#t-cot').value = state.config.lastCot;
     if(!$('#tr-cot').value) $('#tr-cot').value = state.config.lastCot;
   }
+  if(state.config.lastCotCli && !$('#tr-cot-cli').value) $('#tr-cot-cli').value = state.config.lastCotCli;
   if($('#u-pct').value==='') $('#u-pct').value = state.config.usdtPct;
   if($('#tr-pct').value==='') $('#tr-pct').value = state.config.transfPct;
   if($('#tr-rec').value==='') $('#tr-rec').value = state.config.transfRec ?? 0;
@@ -478,12 +487,12 @@ function calc(){
   if(tipo==='transf'){
     const p=num('#tr-pesos'), modo=$('#tr-modo').value, det=$('#tr-det').value.trim(), rec=num('#tr-rec');
     const comp = compActual?compActual.path:null, base = p/(1+rec/100);
-    if(modo==='cot'){ const c=num('#tr-cot');
-      if(p>0 && c>0){ const usd=p/c, gan=(p-base)/c; r.ok=true;
-        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} a ${c.toLocaleString('es-AR')}`; r.meta={pesos:p,cot:c,modo,det,comprobante:comp,recargo:rec,ganUSD:gan,ganARS:p-base};
+    if(modo==='cot'){ const c=num('#tr-cot'), cc=num('#tr-cot-cli')||c;
+      if(p>0 && c>0){ const usd=p/c, usdBase=base/cc, gan=usd-usdBase; r.ok=true;
+        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} · tuya ${cc.toLocaleString('es-AR')} / financiera ${c.toLocaleString('es-AR')}`;
+        r.meta={pesos:p,cot:c,cotCli:cc,modo,det,comprobante:comp,recargo:rec,ganUSD:gan,ganARS:gan*cc};
         r.movs.push({moneda:'USD',debe:0,haber:usd});
-        r.lines=[['Transferido',fmtARS(p)],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']];
-        if(rec>0) r.lines.splice(1,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',`${fmtARS(p-base)} ≈ ${fmtUSD(gan)}`,'haber']); }
+        r.lines=[['Transferido',fmtARS(p)],[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],[`Equivale a tu cotización ${cc.toLocaleString('es-AR')}`,fmtUSD(usdBase)],[`Financiera acredita a ${c.toLocaleString('es-AR')}`,fmtUSD(usd),'haber'],['Tu ganancia',`${fmtUSD(gan)} ≈ ${fmtARS(gan*cc)}`,gan>=0?'haber':'debe']]; }
     } else { const pct=num('#tr-pct');
       if(p>0){ const desc=p*pct/100, neto=p-desc, gan=neto-base; r.ok=true;
         r.detalle=`${det||'Cliente'} · ${fmtARS(p)} − ${fmtPct(pct)}`; r.meta={pesos:p,pct,modo,det,comprobante:comp,recargo:rec,ganARS:gan};
@@ -523,7 +532,7 @@ $('#btnAdd').addEventListener('click', async () => {
   const { error } = await sb.from('movimientos').insert(rows);
   $('#btnAdd').disabled = false;
   if(error){ toast('No se pudo registrar: ' + error.message); return; }
-  if(r.meta.cot){ state.config.lastCot = r.meta.cot; guardarConfig(); }
+  if(r.meta.cot){ state.config.lastCot = r.meta.cot; } if(r.meta.cotCli){ state.config.lastCotCli = r.meta.cotCli; } if(r.meta.cot||r.meta.cotCli) guardarConfig();
   toast(editando ? 'Movimiento actualizado' : 'Operación registrada');
   terminarEdicion(false);
   ['#c-pesos','#t-pesos','#t-base','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-base','#tr-det'].forEach(s=>$(s).value='');
@@ -548,7 +557,7 @@ function empezarEdicion(o){
   if(o.tipo==='entrega'){ put('#e-usd',o.haber); put('#e-det',m.det); }
   if(o.tipo==='usdt'){ put('#u-usd',m.usd); put('#u-pct',m.pct); put('#u-prov',m.prov); }
   if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); put('#tr-rec', m.recargo ?? 0); put('#tr-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
-    $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot',m.cot); put('#tr-pct',m.pct);
+    $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot',m.cot); put('#tr-cot-cli',m.cotCli); put('#tr-pct',m.pct);
     compActual = m.comprobante ? {path:m.comprobante} : null; $('#dropPrev').innerHTML=''; $('#ocrStatus').textContent = m.comprobante ? 'Se conserva el comprobante ya guardado.' : ''; }
   if(o.tipo==='ajuste'){ put('#a-usd', o.haber ? o.haber : -o.debe); $('#a-mon').value = o.moneda||'USD'; put('#a-det',m.det); }
   $('#asideTitle').textContent = 'Editar operación'; $('#editBanner').hidden = false; $('#btnAdd').textContent = 'Guardar cambios';
