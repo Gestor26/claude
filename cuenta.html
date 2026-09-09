@@ -81,7 +81,8 @@
   dialog::backdrop{background:rgba(27,42,34,.45)}
   dialog h2{margin:0 0 6px}
   dialog p{margin:0 0 10px;color:var(--ink-2);font-size:.9rem}
-  .cuotas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px}
+  .cuotas-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 10px;align-items:center;font-size:.88rem}
+  .cuotas-grid .h{color:var(--ink-2);font-size:.8rem}
   .cuotas-grid label{margin:0 0 3px}
   .dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
   .dlg-actions button{border:1px solid var(--line);background:#fff;border-radius:var(--r);padding:8px 14px;cursor:pointer}
@@ -140,6 +141,7 @@
 <div class="saldo">
   <p id="saldoTxt" class="favor">Tenés <b class="num">USD 0,00</b> a favor</p>
   <p id="saldoArs" class="favor" style="font-size:1.15rem;margin-top:4px" hidden></p>
+  <p id="gananciaTxt" style="font-size:1rem;margin-top:8px;color:var(--ink-2)" hidden></p>
   <small id="saldoSub">Todavía no cargaste operaciones.</small>
 </div>
 
@@ -184,8 +186,16 @@
           <input type="number" id="t-pct" inputmode="decimal" step="any" placeholder="1,60">
         </div>
       </div>
-      <label for="t-cot">Cotización para pasar a USD</label>
-      <input type="number" id="t-cot" inputmode="decimal" placeholder="1550" step="any">
+      <div class="row2">
+        <div>
+          <label for="t-rec">Recargo al cliente %</label>
+          <input type="number" id="t-rec" inputmode="decimal" step="any" placeholder="55">
+        </div>
+        <div>
+          <label for="t-cot">Cotización</label>
+          <input type="number" id="t-cot" inputmode="decimal" placeholder="1550" step="any">
+        </div>
+      </div>
       <label for="t-det">Detalle (opcional)</label>
       <input type="text" id="t-det" placeholder="Cliente, equipo…">
     </div>
@@ -219,6 +229,8 @@
       <div class="ocr-status" id="ocrStatus"></div>
       <label for="tr-pesos">Monto transferido (ARS)</label>
       <input type="number" id="tr-pesos" inputmode="decimal" placeholder="150.000" step="any">
+      <label for="tr-rec">Recargo al cliente %</label>
+      <input type="number" id="tr-rec" inputmode="decimal" step="any" placeholder="3">
       <label for="tr-modo">¿Cómo te lo acredita?</label>
       <select id="tr-modo">
         <option value="cot">En dólares, a una cotización</option>
@@ -281,9 +293,17 @@
   <p>Se usan como valor por defecto al cargar cada operación. Siempre podés cambiar el % en la operación puntual.</p>
   <label for="cfg-usdt">Comisión por envío de USDT (%)</label>
   <input type="number" id="cfg-usdt" step="any">
-  <label for="cfg-transf">Descuento por transferencia de clientes (%)</label>
-  <input type="number" id="cfg-transf" step="any">
-  <label>Coeficiente del posnet según cuotas (el monto se divide por este número)</label>
+  <div class="row2">
+    <div>
+      <label for="cfg-transf">Transferencia: descuento de la financiera (%)</label>
+      <input type="number" id="cfg-transf" step="any">
+    </div>
+    <div>
+      <label for="cfg-transf-rec">Transferencia: recargo al cliente (%)</label>
+      <input type="number" id="cfg-transf-rec" step="any">
+    </div>
+  </div>
+  <label>Posnet por cuotas: coeficiente de la financiera (÷) y recargo al cliente (%)</label>
   <div class="cuotas-grid" id="cfgCuotas"></div>
   <div class="dlg-actions">
     <button id="cfgCancel">Cancelar</button>
@@ -302,7 +322,7 @@ const SUPABASE_KEY = 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CUOTAS = [1,3,6,12,18,24];
-const DEFAULT_CFG = { usdtPct:2.5, transfPct:0, cuotas:{1:1,3:1,6:1,12:1,18:1,24:1}, lastCot:null };
+const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, cuotas:{1:1,3:1,6:1,12:1,18:1,24:1}, recargos:{1:0,3:0,6:0,12:0,18:0,24:0}, lastCot:null };
 let state = { config:{...DEFAULT_CFG, cuotas:{...DEFAULT_CFG.cuotas}}, ops:[] };
 let user = null;
 
@@ -350,7 +370,7 @@ async function cargar(){
   if(m.error){ toast('Error al cargar: ' + m.error.message); return; }
   state.ops = m.data.map(r => ({ id:r.id, fecha:r.fecha, tipo:r.tipo, detalle:r.detalle||'', moneda:r.moneda||'USD', debe:+r.debe||0, haber:+r.haber||0, meta:r.meta||{}, por:r.creado_por }));
   const d = c.data?.data || {};
-  state.config = { ...DEFAULT_CFG, ...d, cuotas:{...DEFAULT_CFG.cuotas, ...(d.cuotas||{})} };
+  state.config = { ...DEFAULT_CFG, ...d, cuotas:{...DEFAULT_CFG.cuotas, ...(d.cuotas||{})}, recargos:{...DEFAULT_CFG.recargos, ...(d.recargos||{})} };
   fillDefaults(); renderPreview(); render();
 }
 async function guardarConfig(){
@@ -383,9 +403,10 @@ function fillDefaults(){
   }
   if($('#u-pct').value==='') $('#u-pct').value = state.config.usdtPct;
   if($('#tr-pct').value==='') $('#tr-pct').value = state.config.transfPct;
+  if($('#tr-rec').value==='') $('#tr-rec').value = state.config.transfRec ?? 0;
   syncCuotaPct();
 }
-function syncCuotaPct(){ $('#t-pct').value = state.config.cuotas[$('#t-cuotas').value] ?? 1; }
+function syncCuotaPct(){ const q=$('#t-cuotas').value; $('#t-pct').value = state.config.cuotas[q] ?? 1; $('#t-rec').value = (state.config.recargos||{})[q] ?? 0; }
 
 (function initCuotas(){
   $('#t-cuotas').innerHTML = CUOTAS.map(c=>`<option value="${c}">${c===1?'1 pago':c+' cuotas'}</option>`).join('');
@@ -408,12 +429,13 @@ function calc(){
       r.lines=[[origen==='cuenta'?'Pesos que salen de la cuenta':'Pesos entregados',fmtARS(p),origen==='cuenta'?'debe':''],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']]; }
   }
   if(tipo==='tarjeta'){
-    const p=num('#t-pesos'), coef=num('#t-pct'), c=num('#t-cot'), q=$('#t-cuotas').value;
-    if(p>0 && c>0 && coef>0){ const neto=p/coef, usd=neto/c; r.ok=true;
+    const p=num('#t-pesos'), coef=num('#t-pct'), c=num('#t-cot'), q=$('#t-cuotas').value, rec=num('#t-rec');
+    if(p>0 && c>0 && coef>0){ const neto=p/coef, usd=neto/c, base=p/(1+rec/100), gan=neto-base; r.ok=true;
       const det=$('#t-det').value.trim(), cs=coef.toLocaleString('es-AR',{maximumFractionDigits:4});
       r.detalle = `${q==='1'?'1 pago':q+' cuotas'} · ${fmtARS(p)} ÷ ${cs} a ${c.toLocaleString('es-AR')}${det?' · '+det:''}`;
-      r.meta={pesos:p,coef,cot:c,cuotas:+q,det}; r.movs.push({moneda:'USD',debe:0,haber:usd});
-      r.lines=[['Monto pasado',fmtARS(p)],[`÷ coeficiente ${cs}`,fmtARS(neto)],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']]; }
+      r.meta={pesos:p,coef,cot:c,cuotas:+q,det,recargo:rec,ganARS:gan,ganUSD:gan/c}; r.movs.push({moneda:'USD',debe:0,haber:usd});
+      r.lines=[['Monto pasado',fmtARS(p)],[`÷ coeficiente ${cs}`,fmtARS(neto)],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']];
+      if(rec>0) r.lines.splice(2,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',`${fmtARS(gan)} ≈ ${fmtUSD(gan/c)}`,'haber']); }
   }
   if(tipo==='entrega'){
     const u=num('#e-usd');
@@ -428,18 +450,20 @@ function calc(){
       r.lines=[['Recibe el proveedor',fmtUSD(u)],[`Comisión ${fmtPct(pct)}`,'+ '+fmtUSD(com)],['Te debitan',fmtUSD(tot),'debe']]; }
   }
   if(tipo==='transf'){
-    const p=num('#tr-pesos'), modo=$('#tr-modo').value, det=$('#tr-det').value.trim();
-    const comp = compActual?compActual.path:null;
+    const p=num('#tr-pesos'), modo=$('#tr-modo').value, det=$('#tr-det').value.trim(), rec=num('#tr-rec');
+    const comp = compActual?compActual.path:null, base = p/(1+rec/100);
     if(modo==='cot'){ const c=num('#tr-cot');
-      if(p>0 && c>0){ const usd=p/c; r.ok=true;
-        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} a ${c.toLocaleString('es-AR')}`; r.meta={pesos:p,cot:c,modo,det,comprobante:comp};
+      if(p>0 && c>0){ const usd=p/c, gan=(p-base)/c; r.ok=true;
+        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} a ${c.toLocaleString('es-AR')}`; r.meta={pesos:p,cot:c,modo,det,comprobante:comp,recargo:rec,ganUSD:gan,ganARS:p-base};
         r.movs.push({moneda:'USD',debe:0,haber:usd});
-        r.lines=[['Transferido',fmtARS(p)],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']]; }
+        r.lines=[['Transferido',fmtARS(p)],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']];
+        if(rec>0) r.lines.splice(1,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',`${fmtARS(p-base)} ≈ ${fmtUSD(gan)}`,'haber']); }
     } else { const pct=num('#tr-pct');
-      if(p>0){ const desc=p*pct/100, neto=p-desc; r.ok=true;
-        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} − ${fmtPct(pct)}`; r.meta={pesos:p,pct,modo,det,comprobante:comp};
+      if(p>0){ const desc=p*pct/100, neto=p-desc, gan=neto-base; r.ok=true;
+        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} − ${fmtPct(pct)}`; r.meta={pesos:p,pct,modo,det,comprobante:comp,recargo:rec,ganARS:gan};
         r.movs.push({moneda:'ARS',debe:0,haber:neto});
-        r.lines=[['Transferido',fmtARS(p)],[`Descuento ${fmtPct(pct)}`,'− '+fmtARS(desc)],['Te acreditan en pesos',fmtARS(neto),'haber']]; }
+        r.lines=[['Transferido',fmtARS(p)],[`Descuento ${fmtPct(pct)}`,'− '+fmtARS(desc)],['Te acreditan en pesos',fmtARS(neto),'haber']];
+        if(rec>0) r.lines.splice(2,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',fmtARS(gan),gan>=0?'haber':'debe']); }
     }
   }
   if(tipo==='ajuste'){
@@ -494,10 +518,10 @@ function empezarEdicion(o){
   $('#fecha').value = o.fecha;
   const put = (id,v) => { $(id).value = (v===undefined||v===null) ? '' : v; };
   if(o.tipo==='compra'){ put('#c-pesos',m.pesos); put('#c-cot',m.cot); $('#c-origen').value = m.origen||'llevo'; }
-  if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); }
+  if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); put('#t-rec', m.recargo ?? 0); }
   if(o.tipo==='entrega'){ put('#e-usd',o.haber); put('#e-det',m.det); }
   if(o.tipo==='usdt'){ put('#u-usd',m.usd); put('#u-pct',m.pct); put('#u-prov',m.prov); }
-  if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
+  if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); put('#tr-rec', m.recargo ?? 0); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
     $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot',m.cot); put('#tr-pct',m.pct);
     compActual = m.comprobante ? {path:m.comprobante} : null; $('#dropPrev').innerHTML=''; $('#ocrStatus').textContent = m.comprobante ? 'Se conserva el comprobante ya guardado.' : ''; }
   if(o.tipo==='ajuste'){ put('#a-usd', o.haber ? o.haber : -o.debe); $('#a-mon').value = o.moneda||'USD'; put('#a-det',m.det); }
@@ -535,7 +559,11 @@ function render(){
   const partes = [];
   if(vis.some(o=>o.moneda==='USD')) partes.push(`<span>USD: acreditado <b class="num">${fmtUSD(sum('USD','haber'))}</b> · debitado <b class="num">${fmtUSD(sum('USD','debe'))}</b></span>`);
   if(vis.some(o=>o.moneda==='ARS')) partes.push(`<span>ARS: acreditado <b class="num">${fmtARS(sum('ARS','haber'))}</b> · debitado <b class="num">${fmtARS(sum('ARS','debe'))}</b></span>`);
+  const gA = vis.reduce((s,o)=>s+(o.meta?.ganARS||0),0), gU = vis.reduce((s,o)=>s+(o.meta?.ganUSD||0),0);
+  if(vis.some(o=>o.meta?.ganARS)) partes.push(`<span>Tu ganancia: <b class="num">${fmtARS(gA)}</b>${gU?` <span style="color:var(--ink-2)">(≈ ${fmtUSD(gU)} en las operaciones con cotización)</span>`:''}</span>`);
   $('#totals').innerHTML = partes.join('');
+  const mesAct = today().slice(0,7), gMes = all.filter(o=>o.fecha.startsWith(mesAct)).reduce((s,o)=>s+(o.meta?.ganARS||0),0), gTot = all.reduce((s,o)=>s+(o.meta?.ganARS||0),0);
+  const gEl = $('#gananciaTxt'); gEl.hidden = !gTot; if(gTot) gEl.innerHTML = `Tu ganancia por recargos: <b class="num" style="color:var(--green)">${fmtARS(gMes)}</b> este mes · ${fmtARS(gTot)} histórico`;
 
   if(!vis.length){
     $('#ledgerWrap').innerHTML = `<div class="empty">${all.length?'Ningún movimiento coincide con el filtro.':'Cargá la primera operación desde el panel de la izquierda.'}</div>`;
@@ -544,7 +572,7 @@ function render(){
   const rows = [...vis].reverse().map(o => `
     <tr class="${editando && (o.id===editando.id || (o.meta?.grupo && o.meta.grupo===editando.meta?.grupo))?'sel':''}">
       <td class="num">${fmtFecha(o.fecha)}</td>
-      <td><span class="tag">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}</span></td>
+      <td><span class="tag">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}${o.meta?.ganARS?` · <span style="color:var(--green)">ganancia ${fmtARS(o.meta.ganARS)}</span>`:''}</span></td>
       <td class="n num debe">${o.debe?fmtMon(o.moneda,o.debe):''}</td>
       <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):''}</td>
       <td class="n num saldo ${saldoUSD[o.id]<0?'neg':''}">${fmtUSD(saldoUSD[o.id])}</td>
@@ -576,15 +604,18 @@ const dlg = $('#dlgConfig');
 $('#btnConfig').addEventListener('click', () => {
   $('#cfg-usdt').value = state.config.usdtPct;
   $('#cfg-transf').value = state.config.transfPct ?? 0;
-  $('#cfgCuotas').innerHTML = CUOTAS.map(c=>`<div><label for="cfg-q${c}">${c===1?'1 pago':c+' cuotas'}</label><input type="number" step="any" id="cfg-q${c}" value="${state.config.cuotas[c]??1}"></div>`).join('');
+  $('#cfg-transf-rec').value = state.config.transfRec ?? 0;
+  $('#cfgCuotas').innerHTML = '<div class="h">Plan</div><div class="h">Coeficiente ÷</div><div class="h">Recargo %</div>' + CUOTAS.map(c=>`<div>${c===1?'1 pago':c+' cuotas'}</div><input type="number" step="any" id="cfg-q${c}" value="${state.config.cuotas[c]??1}" aria-label="Coeficiente ${c} cuotas"><input type="number" step="any" id="cfg-r${c}" value="${(state.config.recargos||{})[c]??0}" aria-label="Recargo ${c} cuotas">`).join('');
   dlg.showModal();
 });
 $('#cfgCancel').addEventListener('click', ()=>dlg.close());
 $('#cfgSave').addEventListener('click', async () => {
   state.config.usdtPct = parseFloat($('#cfg-usdt').value)||0;
   state.config.transfPct = parseFloat($('#cfg-transf').value)||0;
-  CUOTAS.forEach(c => state.config.cuotas[c] = parseFloat($('#cfg-q'+c).value)||1);
-  await guardarConfig(); dlg.close(); $('#u-pct').value = state.config.usdtPct; $('#tr-pct').value = state.config.transfPct; syncCuotaPct(); renderPreview(); toast('Comisiones guardadas');
+  state.config.transfRec = parseFloat($('#cfg-transf-rec').value)||0;
+  state.config.recargos = state.config.recargos || {};
+  CUOTAS.forEach(c => { state.config.cuotas[c] = parseFloat($('#cfg-q'+c).value)||1; state.config.recargos[c] = parseFloat($('#cfg-r'+c).value)||0; });
+  await guardarConfig(); dlg.close(); $('#u-pct').value = state.config.usdtPct; $('#tr-pct').value = state.config.transfPct; $('#tr-rec').value = state.config.transfRec; syncCuotaPct(); renderPreview(); toast('Comisiones guardadas');
 });
 
 // ---------- exportar ----------
