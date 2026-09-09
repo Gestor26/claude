@@ -174,8 +174,16 @@
     </div>
 
     <div id="f-tarjeta" hidden>
-      <label for="t-pesos">Monto pasado por el posnet (ARS)</label>
-      <input type="number" id="t-pesos" inputmode="decimal" placeholder="500.000" step="any">
+      <div class="row2">
+        <div>
+          <label for="t-base">Precio base (lo que cobrás)</label>
+          <input type="number" id="t-base" inputmode="decimal" placeholder="50.000" step="any">
+        </div>
+        <div>
+          <label for="t-pesos">Monto a pasar (con recargo)</label>
+          <input type="number" id="t-pesos" inputmode="decimal" placeholder="77.500" step="any">
+        </div>
+      </div>
       <div class="row2">
         <div>
           <label for="t-cuotas">Cuotas</label>
@@ -227,8 +235,16 @@
       <div class="drop" id="drop">Tocá para sacar foto o elegir la imagen del comprobante<div id="dropPrev"></div></div>
       <input type="file" id="tr-file" accept="image/*" capture="environment" hidden>
       <div class="ocr-status" id="ocrStatus"></div>
-      <label for="tr-pesos">Monto transferido (ARS)</label>
-      <input type="number" id="tr-pesos" inputmode="decimal" placeholder="150.000" step="any">
+      <div class="row2">
+        <div>
+          <label for="tr-base">Precio base (lo que cobrás)</label>
+          <input type="number" id="tr-base" inputmode="decimal" placeholder="50.000" step="any">
+        </div>
+        <div>
+          <label for="tr-pesos">Monto transferido (con recargo)</label>
+          <input type="number" id="tr-pesos" inputmode="decimal" placeholder="51.500" step="any">
+        </div>
+      </div>
       <label for="tr-rec">Recargo al cliente %</label>
       <input type="number" id="tr-rec" inputmode="decimal" step="any" placeholder="3">
       <label for="tr-modo">¿Cómo te lo acredita?</label>
@@ -413,6 +429,16 @@ function syncCuotaPct(){ const q=$('#t-cuotas').value; $('#t-pct').value = state
   $('#t-cuotas').addEventListener('change', ()=>{ syncCuotaPct(); renderPreview(); });
 })();
 
+// ---------- precio base ⇄ monto con recargo ----------
+function enlazar(baseId, montoId, recId){
+  const r2 = n => Math.round(n*100)/100;
+  $(baseId).addEventListener('input', ()=>{ const b=num(baseId), rec=num(recId); $(montoId).value = b>0 ? r2(b*(1+rec/100)) : ''; renderPreview(); });
+  $(montoId).addEventListener('input', ()=>{ const p=num(montoId), rec=num(recId); $(baseId).value = p>0 ? r2(p/(1+rec/100)) : ''; renderPreview(); });
+  $(recId).addEventListener('input', ()=>{ const b=num(baseId), rec=num(recId); if(b>0) $(montoId).value = r2(b*(1+rec/100)); renderPreview(); });
+}
+enlazar('#t-base','#t-pesos','#t-rec'); enlazar('#tr-base','#tr-pesos','#tr-rec');
+$('#t-cuotas').addEventListener('change', ()=>{ const b=num('#t-base'); if(b>0) $('#t-pesos').value = Math.round(b*(1+num('#t-rec')/100)*100)/100; renderPreview(); });
+
 // ---------- cálculo ----------
 const fmtMon = (m,n) => m==='USD' ? fmtUSD(n) : fmtARS(n);
 $('#tr-modo').addEventListener('change', ()=>{ const pct = $('#tr-modo').value==='pct'; $('#tr-modo-pct').hidden = !pct; $('#tr-modo-cot').hidden = pct; renderPreview(); });
@@ -500,7 +526,7 @@ $('#btnAdd').addEventListener('click', async () => {
   if(r.meta.cot){ state.config.lastCot = r.meta.cot; guardarConfig(); }
   toast(editando ? 'Movimiento actualizado' : 'Operación registrada');
   terminarEdicion(false);
-  ['#c-pesos','#t-pesos','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-det'].forEach(s=>$(s).value='');
+  ['#c-pesos','#t-pesos','#t-base','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-base','#tr-det'].forEach(s=>$(s).value='');
   limpiarComprobante(); renderPreview(); cargar();
 });
 
@@ -518,10 +544,10 @@ function empezarEdicion(o){
   $('#fecha').value = o.fecha;
   const put = (id,v) => { $(id).value = (v===undefined||v===null) ? '' : v; };
   if(o.tipo==='compra'){ put('#c-pesos',m.pesos); put('#c-cot',m.cot); $('#c-origen').value = m.origen||'llevo'; }
-  if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); put('#t-rec', m.recargo ?? 0); }
+  if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); put('#t-rec', m.recargo ?? 0); put('#t-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); }
   if(o.tipo==='entrega'){ put('#e-usd',o.haber); put('#e-det',m.det); }
   if(o.tipo==='usdt'){ put('#u-usd',m.usd); put('#u-pct',m.pct); put('#u-prov',m.prov); }
-  if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); put('#tr-rec', m.recargo ?? 0); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
+  if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); put('#tr-rec', m.recargo ?? 0); put('#tr-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
     $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot',m.cot); put('#tr-pct',m.pct);
     compActual = m.comprobante ? {path:m.comprobante} : null; $('#dropPrev').innerHTML=''; $('#ocrStatus').textContent = m.comprobante ? 'Se conserva el comprobante ya guardado.' : ''; }
   if(o.tipo==='ajuste'){ put('#a-usd', o.haber ? o.haber : -o.debe); $('#a-mon').value = o.moneda||'USD'; put('#a-det',m.det); }
@@ -532,7 +558,7 @@ function empezarEdicion(o){
 function terminarEdicion(limpiar=true){
   editando = null;
   $('#asideTitle').textContent = 'Nueva operación'; $('#editBanner').hidden = true; $('#btnAdd').textContent = 'Registrar operación';
-  if(limpiar){ ['#c-pesos','#t-pesos','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-det'].forEach(s=>$(s).value=''); limpiarComprobante(); $('#fecha').value = today(); renderPreview(); render(); }
+  if(limpiar){ ['#c-pesos','#t-pesos','#t-base','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-base','#tr-det'].forEach(s=>$(s).value=''); limpiarComprobante(); $('#fecha').value = today(); renderPreview(); render(); }
 }
 $('#editCancel').addEventListener('click', ()=>terminarEdicion(true));
 
