@@ -26,21 +26,23 @@
   <button class="on" data-s="cuenta">Cuenta Corriente</button>
   <button data-s="tienda">Store Generator</button>
   <button data-s="wsp">WhatsApp</button>
+  <button data-s="gastos">Gastos</button>
 </nav>
 <main>
   <iframe id="f-cuenta" src="cuenta.html?v=9" title="Cuenta Corriente"></iframe>
   <iframe id="f-tienda" data-src="tienda/index.html?v=4" title="Store Generator" hidden></iframe>
+  <iframe id="f-gastos" data-src="gastos.html?v=1" title="Gastos" hidden></iframe>
   <iframe id="f-wsp" data-src="whatsapp/index.html?v=1" title="WhatsApp" hidden allow="clipboard-write"></iframe>
 </main>
 <script>
   const ir = location.hash.slice(1);
   function show(s){
     document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.s===s));
-    ['cuenta','tienda','wsp'].forEach(k=>{ const f=document.getElementById('f-'+k); f.hidden = k!==s; if(k===s && !f.src && f.dataset.src) f.src = f.dataset.src; });
+    ['cuenta','tienda','wsp','gastos'].forEach(k=>{ const f=document.getElementById('f-'+k); f.hidden = k!==s; if(k===s && !f.src && f.dataset.src) f.src = f.dataset.src; });
     history.replaceState(null,'','#'+s);
   }
   document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) show(b.dataset.s); });
-  if(ir==='tienda'||ir==='wsp') show(ir);
+  if(['tienda','wsp','gastos'].includes(ir)) show(ir);
   window.addEventListener('message', e=>{ if(e.data && e.data.farroyo) show(e.data.farroyo); });
 </script>
 </body>
