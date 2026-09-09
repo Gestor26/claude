@@ -203,7 +203,7 @@ const SUPABASE_URL = 'https://dyzwgtvilvayihouvwxt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const CATS_DEF = ['Comida','Super','Transporte','Salidas','Casa','Servicios','Salud','Ropa','Auto','Regalos','Otros'];
+const CATS_DEF = ['Comida','Super','Transporte','Salidas','Casa','Servicios','Salud','Ropa','Auto','Regalos','Sueldo','Otros'];
 const DEFAULT_CFG = { presupuesto:null, cot:null, cats:CATS_DEF };
 let state = { config:{...DEFAULT_CFG}, gastos:[] };
 let user = null, cat = null, editando = null, ambito = 'Personal';
@@ -251,7 +251,8 @@ async function cargar(){
   if(g.error){ toast('Error al cargar: ' + g.error.message); return; }
   state.gastos = g.data.map(r => ({ id:r.id, fecha:r.fecha, monto:+r.monto, moneda:r.moneda||'ARS', categoria:r.categoria||'Otros', detalle:r.detalle||'', medio:r.medio||'', ambito:r.ambito||'Personal' }));
   const d = c.data?.data || {};
-  state.config = { ...DEFAULT_CFG, ...d, cats: (d.cats && d.cats.length) ? d.cats : CATS_DEF };
+  state.config = { ...DEFAULT_CFG, ...d, cats: (d.cats && d.cats.length) ? d.cats : [...CATS_DEF] };
+  if(!state.config.cats.includes('Sueldo')){ const i = state.config.cats.indexOf('Otros'); state.config.cats.splice(i<0?state.config.cats.length:i, 0, 'Sueldo'); }
   if(!cat || !state.config.cats.includes(cat)) cat = state.config.cats[0];
   renderCats(); render();
 }
