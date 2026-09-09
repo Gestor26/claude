@@ -187,12 +187,12 @@
     <div id="f-tarjeta" hidden>
       <div class="row2">
         <div>
-          <label for="t-base">Precio base (lo que cobrás)</label>
-          <input type="number" id="t-base" inputmode="decimal" placeholder="50.000" step="any">
+          <label for="t-pesos">Total del ticket (con recargo)</label>
+          <input type="number" id="t-pesos" inputmode="decimal" placeholder="77.500" step="any">
         </div>
         <div>
-          <label for="t-pesos">Monto a pasar (con recargo)</label>
-          <input type="number" id="t-pesos" inputmode="decimal" placeholder="77.500" step="any">
+          <label for="t-base">Precio base (calculado)</label>
+          <input type="number" id="t-base" inputmode="decimal" placeholder="50.000" step="any" readonly tabindex="-1" style="background:var(--paper-2);color:var(--ink-2)">
         </div>
       </div>
       <div class="row2">
@@ -248,12 +248,12 @@
       <div class="ocr-status" id="ocrStatus"></div>
       <div class="row2">
         <div>
-          <label for="tr-base">Precio base (lo que cobrás)</label>
-          <input type="number" id="tr-base" inputmode="decimal" placeholder="50.000" step="any">
+          <label for="tr-pesos">Total transferido (con recargo)</label>
+          <input type="number" id="tr-pesos" inputmode="decimal" placeholder="51.500" step="any">
         </div>
         <div>
-          <label for="tr-pesos">Monto transferido (con recargo)</label>
-          <input type="number" id="tr-pesos" inputmode="decimal" placeholder="51.500" step="any">
+          <label for="tr-base">Precio base (calculado)</label>
+          <input type="number" id="tr-base" inputmode="decimal" placeholder="50.000" step="any" readonly tabindex="-1" style="background:var(--paper-2);color:var(--ink-2)">
         </div>
       </div>
       <label for="tr-rec">Recargo al cliente %</label>
@@ -459,10 +459,10 @@ function enlazar(baseId, montoId, recId){
   const r2 = n => Math.round(n*100)/100;
   $(baseId).addEventListener('input', ()=>{ const b=num(baseId), rec=num(recId); $(montoId).value = b>0 ? r2(b*(1+rec/100)) : ''; renderPreview(); });
   $(montoId).addEventListener('input', ()=>{ const p=num(montoId), rec=num(recId); $(baseId).value = p>0 ? r2(p/(1+rec/100)) : ''; renderPreview(); });
-  $(recId).addEventListener('input', ()=>{ const b=num(baseId), rec=num(recId); if(b>0) $(montoId).value = r2(b*(1+rec/100)); renderPreview(); });
+  $(recId).addEventListener('input', ()=>{ const p=num(montoId), rec=num(recId); if(p>0) $(baseId).value = r2(p/(1+rec/100)); renderPreview(); });
 }
 enlazar('#t-base','#t-pesos','#t-rec'); enlazar('#tr-base','#tr-pesos','#tr-rec');
-$('#t-cuotas').addEventListener('change', ()=>{ const b=num('#t-base'); if(b>0) $('#t-pesos').value = Math.round(b*(1+num('#t-rec')/100)*100)/100; renderPreview(); });
+$('#t-cuotas').addEventListener('change', ()=>{ const p=num('#t-pesos'); if(p>0) $('#t-base').value = Math.round(p/(1+num('#t-rec')/100)*100)/100; renderPreview(); });
 
 // ---------- cálculo ----------
 const fmtMon = (m,n) => m==='USD' ? fmtUSD(n) : fmtARS(n);
