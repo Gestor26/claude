@@ -121,7 +121,8 @@
   <div><div class="k" id="rUsdK">Gastado en USD total</div><div class="v num" id="rUsd">USD 0,00</div></div>
   <div><div class="k" id="rMesK">Todo junto en pesos</div><div class="v num" id="rMes">ARS 0</div><div class="barra" id="rBarra" hidden><i></i></div><div class="k" id="rPres"></div></div>
   <div><div class="k">Hoy</div><div class="v num" id="rHoy">ARS 0</div></div>
-  <div><div class="k">Promedio por día este mes</div><div class="v num" id="rProm">ARS 0</div></div>
+  <div><div class="k">Promedio por día en pesos</div><div class="v num" id="rProm">ARS 0</div></div>
+  <div><div class="k">Promedio por día en USD</div><div class="v num" id="rPromUsd">USD 0,00</div></div>
   <div><div class="k">Mes anterior</div><div class="v num" id="rAnt">ARS 0</div></div>
 </div>
 
@@ -314,7 +315,9 @@ function render(){
   $('#rMesK').textContent = 'Todo junto en pesos' + (state.config.cot ? '' : ' (sin cotización, USD no se suma)');
   const totMes = suma(mes); $('#rMes').textContent = fmtARS(totMes);
   const dias = mesVista===mesAct ? +t.slice(8) : new Date(+mesVista.slice(0,4), +mesVista.slice(5), 0).getDate();
-  $('#rProm').textContent = fmtARS(mes.length ? totMes/dias : 0);
+  const arsMes = mes.filter(g=>g.moneda!=='USD').reduce((s,g)=>s+g.monto,0), usdMes = mes.filter(g=>g.moneda==='USD').reduce((s,g)=>s+g.monto,0);
+  $('#rProm').textContent = fmtARS(mes.length ? arsMes/dias : 0);
+  $('#rPromUsd').textContent = fmtUSD(mes.length ? usdMes/dias : 0);
   $('#rAnt').textContent = fmtARS(suma(ant));
   const pres = state.config.presupuesto;
   if(pres>0){ const pct = totMes/pres*100; $('#rBarra').hidden=false; const i=$('#rBarra i'); i.style.width=Math.min(100,pct)+'%'; i.className = pct>100?'pasado':pct>80?'alto':''; $('#rPres').textContent = pct>100 ? `Te pasaste ${fmtARS(totMes-pres)} del presupuesto de ${fmtARS(pres)}` : `${Math.round(pct)}% del presupuesto · quedan ${fmtARS(pres-totMes)}`; }
