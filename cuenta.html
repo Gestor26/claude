@@ -83,6 +83,7 @@
   .pend li .liq{background:var(--green);color:#fff;border:0;border-radius:var(--r);padding:5px 10px;cursor:pointer;font-size:.82rem;white-space:nowrap}
   .pend .dias{color:var(--ink-2);font-size:.82rem}
   .pend .dias.tarde{color:var(--red)}
+  .ledger .liq-row{background:var(--green);color:#fff;border:0;border-radius:var(--r);padding:4px 9px;cursor:pointer;font-size:.8rem;margin-right:6px;vertical-align:middle}
   .ledger .del:hover{color:var(--red)}
   .empty{padding:36px 20px;text-align:center;color:var(--ink-2);background:#fff;border:1px dashed var(--line)}
   .wrap{overflow-x:auto}
@@ -651,7 +652,7 @@ function render(){
       <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):''}</td>
       <td class="n num saldo ${saldoUSD[o.id]<0?'neg':''}">${fmtUSD(saldoUSD[o.id])}</td>
       ${hayArs?`<td class="n num saldo ${saldoARS[o.id]<0?'neg':''}">${fmtARS(saldoARS[o.id])}</td>`:''}
-      <td style="white-space:nowrap"><button class="edit" data-id="${o.id}" title="Editar">✎</button><button class="del" data-id="${o.id}" title="Eliminar">×</button></td>
+      <td style="white-space:nowrap">${o.meta?.pendiente?`<button class="liq-row" data-id="${o.id}" title="Marcar como liquidado">Liquidar</button>`:''}<button class="edit" data-id="${o.id}" title="Editar">✎</button><button class="del" data-id="${o.id}" title="Eliminar">×</button></td>
     </tr>`).join('');
   $('#ledgerWrap').innerHTML = `<table class="ledger">
     <thead><tr><th>Fecha</th><th>Operación</th><th class="n">Debe</th><th class="n">Haber</th><th class="n">Saldo USD</th>${hayArs?'<th class="n">Saldo ARS</th>':''}<th></th></tr></thead>
@@ -662,6 +663,7 @@ $('#ledgerWrap').addEventListener('click', async e => {
   const a = e.target.closest('.adj');
   if(a){ e.preventDefault(); const { data, error } = await sb.storage.from('comprobantes').createSignedUrl(a.dataset.path, 300);
     if(error){ toast('No se pudo abrir el comprobante: ' + error.message); return; } window.open(data.signedUrl, '_blank'); return; }
+  const lq = e.target.closest('.liq-row'); if(lq){ liquidar([+lq.dataset.id]); return; }
   const ed = e.target.closest('.edit');
   if(ed){ const o = state.ops.find(x=>x.id==ed.dataset.id); if(o) empezarEdicion(o); return; }
   const b = e.target.closest('.del'); if(!b) return;
