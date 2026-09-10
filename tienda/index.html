@@ -327,6 +327,7 @@ var H2C_URL = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2can
 
 var PRODS = [
   {id:'usados',        nm:'iPhone',          tp:'Usados',          em:'📱', col:'#1a3a5c', csub:'#a0b8d0'},
+  {id:'outlet',        nm:'iPhone',          tp:'Outlet',          em:'📱', col:'#7a3e0a', csub:'#f0c090'},
   {id:'sellados',      nm:'iPhone',          tp:'Sellados',        em:'📱', col:'#0d5c3a', csub:'#7ecfaa'},
   {id:'openbox',       nm:'iPhone',          tp:'Open Box',        em:'📱', col:'#4a2a7a', csub:'#c9a8f0'},
   {id:'watch',         nm:'Apple Watch',     tp:'Open Box',        em:'⌚', col:'#7a2a1a', csub:'#f0b8a8'},
@@ -346,6 +347,7 @@ var PRODS = [
 
 var VIS = {
   usados:        {tit:'IPHONE',        sub:'USADOS',          tfs:106, gar:'3 Meses de Garant\u00eda + Cargador y Cable USB',            col:'#1a3a5c', csub:'#a0b8d0'},
+  outlet:        {tit:'IPHONE',        sub:'OUTLET',          tfs:106, gar:'3 Meses de Garant\u00eda + Cargador y Cable USB',            col:'#7a3e0a', csub:'#f0c090'},
   sellados:      {tit:'IPHONE',        sub:'NUEVOS SELLADOS', tfs:106, gar:'1 A\u00f1o de Garant\u00eda Oficial + Cargador 20W incluido', col:'#0d5c3a', csub:'#7ecfaa'},
   openbox:       {tit:'IPHONE',        sub:'NUEVOS OPEN BOX', tfs:106, gar:'1 A\u00f1o de Garant\u00eda + Cargador 20W incluido',         col:'#4a2a7a', csub:'#c9a8f0'},
   watch:         {tit:'APPLE WATCH',   sub:'NUEVOS OPEN BOX', tfs:86,  gar:'1 A\u00f1o de Garant\u00eda + Cable de Carga incluido',        col:'#7a2a1a', csub:'#f0b8a8'},
@@ -748,6 +750,7 @@ function limpiarTodoTodo(){
 
 // ═══ UI INIT ══════════════════════════════════════════════════════
 var pgrid=document.getElementById('pgrid');
+pgrid.innerHTML='';
 PRODS.forEach(function(p){
   var b=document.createElement('div'); b.className='pbtn';
   b.innerHTML='<div class="dot" style="background:'+p.col+'30;border:2px solid '+p.col+'">'+p.em+'</div><div class="nm">'+p.nm+'</div><div class="tp">'+p.tp+'</div>';
@@ -1175,6 +1178,25 @@ function parsearUsados(rows){
   Object.keys(gr).forEach(function(k){var g=gr[k],bv=g.bats.filter(function(b){return b>=85;});if(!bv.length)return;var mn=Math.min.apply(null,bv),mx=Math.max.apply(null,bv),verde=mn>=90;out.push({n:g.n,mem:g.mem,usd:g.usd,rango:mn===mx?mn+'%':mn+'% \u2014 '+mx+'%',mn:mn,bg:verde?'#D1FAE5':'#FEF3C7',fg:verde?'#15803d':'#92400E'});});
   return out.sort(function(a,b){return(-numIP(a.n)+numIP(b.n))||(-capGB(a.mem)+capGB(b.mem))||(-a.mn+b.mn);});
 }
+// Outlet: misma lectura que Usados, pero toma las filas cuyo tipo dice "outlet"
+function parsearOutlet(rows){
+  var raw=[];
+  rows.forEach(function(r){
+    var n=(r[0]||'').trim(); if(!n) return;
+    var esOutlet=false; for(var ci=0;ci<=8;ci++){ if((r[ci]||'').toLowerCase().indexOf('outlet')>=0){ esOutlet=true; break; } }
+    if(!esOutlet) return;
+    var usd=pxUSD(r[6]); if(!usd){ for(var pi=4;pi<=8;pi++){ var v=pxUSD(r[pi]); if(v>0&&v<9999){ usd=v; break; } } }
+    if(!usd) return;
+    var bat=parseInt(r[3])||0;
+    raw.push({n:LIMPIAR(n),mem:(r[2]||'').trim(),bat:bat,usd:usd});
+  });
+  var gr={};
+  raw.forEach(function(x){var k=x.n+'|'+x.mem+'|'+x.usd;if(!gr[k])gr[k]={n:x.n,mem:x.mem,usd:x.usd,bats:[]};if(x.bat)gr[k].bats.push(x.bat);});
+  var out=[];
+  Object.keys(gr).forEach(function(k){var g=gr[k],bv=g.bats;var mn=bv.length?Math.min.apply(null,bv):0,mx=bv.length?Math.max.apply(null,bv):0,verde=mn>=90;
+    out.push({n:g.n,mem:g.mem,usd:g.usd,rango:bv.length?(mn===mx?mn+'%':mn+'% \u2014 '+mx+'%'):'',mn:mn,bg:verde?'#D1FAE5':'#FEF3C7',fg:verde?'#15803d':'#92400E'});});
+  return out.sort(function(a,b){return(-numIP(a.n)+numIP(b.n))||(-capGB(a.mem)+capGB(b.mem))||(-a.mn+b.mn);});
+}
 function parsearSellados(rows){
   var out=[];
   rows.forEach(function(r){
@@ -1449,7 +1471,7 @@ function parsearBaterias(rows){
   return dedup(out,function(x){return x.n+'|'+x.usd;}).sort(function(a,b){return b._ord-a._ord;});
 }
 
-var PARSERS={usados:parsearUsados,sellados:parsearSellados,openbox:parsearOpenBox,watch:parsearWatch,ipad:parsearIPad,macbook:parsearMacBook,airpods:parsearAirPods,pencil:parsearPencil,baterias:parsearBaterias,modulos:parsearBaterias,ps5:parsearPS5,
+var PARSERS={usados:parsearUsados,outlet:parsearOutlet,sellados:parsearSellados,openbox:parsearOpenBox,watch:parsearWatch,ipad:parsearIPad,macbook:parsearMacBook,airpods:parsearAirPods,pencil:parsearPencil,baterias:parsearBaterias,modulos:parsearBaterias,ps5:parsearPS5,
   xiaomi_sell:parsearXiaomiSell,
   samsung_sell:parsearSamsungSell,
   samsung_usados:parsearSamsungUsados,
