@@ -1186,8 +1186,8 @@ function parsearOutlet(rows){
   for(var hi=0; hi<Math.min(rows.length,10) && obsCol<0; hi++){ (rows[hi]||[]).forEach(function(c,ci){ if(obsCol<0 && /observ|coment|detalle|nota/i.test(String(c||''))) obsCol=ci; }); }
   rows.forEach(function(r){
     var n=(r[0]||'').trim(); if(!n) return;
-    var esOutlet=false; for(var ci=0;ci<=8;ci++){ if((r[ci]||'').toLowerCase().indexOf('outlet')>=0){ esOutlet=true; break; } }
-    if(!esOutlet) return;
+    // El CSV de Outlet es una planilla aparte: se toman todas las filas con precio (el "Tipo" suele decir Usado)
+    if(/^modelo/i.test(n)) return;
     var usd=pxUSD(r[6]); if(!usd){ for(var pi=4;pi<=8;pi++){ var v=pxUSD(r[pi]); if(v>0&&v<9999){ usd=v; break; } } }
     if(!usd) return;
     var bat=parseInt(r[3])||0;
