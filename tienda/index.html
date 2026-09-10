@@ -1181,6 +1181,9 @@ function parsearUsados(rows){
 // Outlet: misma lectura que Usados, pero toma las filas cuyo tipo dice "outlet"
 function parsearOutlet(rows){
   var raw=[];
+  // Columna de observaciones: la que en el encabezado diga "observ" / "comentario" / "detalle"
+  var obsCol=-1;
+  for(var hi=0; hi<Math.min(rows.length,10) && obsCol<0; hi++){ (rows[hi]||[]).forEach(function(c,ci){ if(obsCol<0 && /observ|coment|detalle|nota/i.test(String(c||''))) obsCol=ci; }); }
   rows.forEach(function(r){
     var n=(r[0]||'').trim(); if(!n) return;
     var esOutlet=false; for(var ci=0;ci<=8;ci++){ if((r[ci]||'').toLowerCase().indexOf('outlet')>=0){ esOutlet=true; break; } }
@@ -1188,13 +1191,14 @@ function parsearOutlet(rows){
     var usd=pxUSD(r[6]); if(!usd){ for(var pi=4;pi<=8;pi++){ var v=pxUSD(r[pi]); if(v>0&&v<9999){ usd=v; break; } } }
     if(!usd) return;
     var bat=parseInt(r[3])||0;
-    raw.push({n:LIMPIAR(n),mem:(r[2]||'').trim(),bat:bat,usd:usd});
+    var obs=obsCol>=0?String(r[obsCol]||'').trim():'';
+    raw.push({n:LIMPIAR(n),mem:(r[2]||'').trim(),bat:bat,usd:usd,obs:obs});
   });
   var gr={};
-  raw.forEach(function(x){var k=x.n+'|'+x.mem+'|'+x.usd;if(!gr[k])gr[k]={n:x.n,mem:x.mem,usd:x.usd,bats:[]};if(x.bat)gr[k].bats.push(x.bat);});
+  raw.forEach(function(x){var k=x.n+'|'+x.mem+'|'+x.usd;if(!gr[k])gr[k]={n:x.n,mem:x.mem,usd:x.usd,bats:[],obs:[]};if(x.bat)gr[k].bats.push(x.bat);if(x.obs&&gr[k].obs.indexOf(x.obs)<0)gr[k].obs.push(x.obs);});
   var out=[];
   Object.keys(gr).forEach(function(k){var g=gr[k],bv=g.bats;var mn=bv.length?Math.min.apply(null,bv):0,mx=bv.length?Math.max.apply(null,bv):0,verde=mn>=90;
-    out.push({n:g.n,mem:g.mem,usd:g.usd,rango:bv.length?(mn===mx?mn+'%':mn+'% \u2014 '+mx+'%'):'',mn:mn,bg:verde?'#D1FAE5':'#FEF3C7',fg:verde?'#15803d':'#92400E'});});
+    out.push({n:g.n,mem:g.mem,usd:g.usd,rango:bv.length?(mn===mx?mn+'%':mn+'% \u2014 '+mx+'%'):'',mn:mn,bg:verde?'#D1FAE5':'#FEF3C7',fg:verde?'#15803d':'#92400E',obs:g.obs.join(' \u00b7 ')});});
   return out.sort(function(a,b){return(-numIP(a.n)+numIP(b.n))||(-capGB(a.mem)+capGB(b.mem))||(-a.mn+b.mn);});
 }
 function parsearSellados(rows){
@@ -1703,6 +1707,7 @@ function buildHTML(prodId,items,parte,total,d){
     if(item.sub)subH='<div style="font-size:'+selSubSize+'px;font-weight:700;color:#1c1917;margin-top:3px;font-family:'+selFont+'">'+item.sub+'</div>';
     if(item.mem)subH='<div style="font-size:'+selSubSize+'px;font-weight:700;color:#1c1917;margin-top:3px;font-family:'+selFont+'">'+item.mem+'</div>';
     var batH=item.rango?'<div style="display:inline-flex;align-items:center;margin-top:6px;padding:4px 14px;border-radius:20px;width:fit-content;background:'+item.bg+'"><span style="font-size:16px;font-weight:700;color:'+item.fg+';font-family:'+selFont+'">&#128267; '+item.rango+'</span></div>':'';
+    var obsH=item.obs?'<div style="margin-top:5px;font-size:16px;font-weight:500;color:#6B7280;font-family:'+selFont+';line-height:1.25">'+String(item.obs).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>':'';
     var stkH=item.sticker?'<div style="margin-top:7px"><span style="display:inline-block;background:#E2E4E8;border-radius:20px;padding:5px 14px;font-size:17px;font-weight:600;color:#4A5060;font-family:'+selFont+'">&#128263; Cancelaci\u00f3n de Sonido</span></div>':'';
     var sldH=item.sellado?'<div style="display:inline-flex;align-items:center;gap:5px;margin-top:5px"><span style="color:#CC0000;font-size:20px">&#9733;</span><span style="font-size:18px;font-weight:700;color:#CC0000;font-family:'+selFont+';letter-spacing:1px">SELLADO</span></div>':'';
     var pagH='';
@@ -1720,7 +1725,7 @@ function buildHTML(prodId,items,parte,total,d){
     if(imgsActivas && imgSrc){
       imgHTML = '<div style="width:'+imgSize+'px;height:'+imgSize+'px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:14px"><img src="'+imgSrc+'" style="max-width:100%;max-height:100%;object-fit:contain"></div>';
     }
-    filas+='<div style="display:grid;grid-template-columns:1fr 155px 1fr;padding:0 55px;align-items:center;gap:14px;height:'+ALT+'px;background:'+bg+'"><div style="min-width:0;display:flex;flex-direction:row;align-items:center">'+imgHTML+'<div style="min-width:0;display:flex;flex-direction:column;justify-content:center;flex:1"><div style="font-size:'+selModSize+'px;font-weight:700;color:#1c1917;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'+selFont+'">'+item.n+'</div>'+subH+batH+stkH+sldH+pagH+'</div></div><div style="background:'+selUsdBg+';border-radius:14px;text-align:center;padding:8px 6px;border:2px solid #fed7aa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><div style="font-size:'+Math.round(selPrecSize*0.55)+'px;color:'+selUsdTxt+';opacity:0.7;font-family:'+selFont+';font-weight:600;min-height:'+LH+'px;display:flex;align-items:center;justify-content:center">'+lblPrecio+'</div><div style="font-size:'+selUsdSize+'px;font-weight:800;color:'+selUsdTxt+';line-height:1;font-family:'+(selPrecFont||selFont)+'">'+precioLabel+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;min-width:0">'+cuotas+'</div></div>'+sep;
+    filas+='<div style="display:grid;grid-template-columns:1fr 155px 1fr;padding:0 55px;align-items:center;gap:14px;height:'+ALT+'px;background:'+bg+'"><div style="min-width:0;display:flex;flex-direction:row;align-items:center">'+imgHTML+'<div style="min-width:0;display:flex;flex-direction:column;justify-content:center;flex:1"><div style="font-size:'+selModSize+'px;font-weight:700;color:#1c1917;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'+selFont+'">'+item.n+'</div>'+subH+batH+obsH+stkH+sldH+pagH+'</div></div><div style="background:'+selUsdBg+';border-radius:14px;text-align:center;padding:8px 6px;border:2px solid #fed7aa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><div style="font-size:'+Math.round(selPrecSize*0.55)+'px;color:'+selUsdTxt+';opacity:0.7;font-family:'+selFont+';font-weight:600;min-height:'+LH+'px;display:flex;align-items:center;justify-content:center">'+lblPrecio+'</div><div style="font-size:'+selUsdSize+'px;font-weight:800;color:'+selUsdTxt+';line-height:1;font-family:'+(selPrecFont||selFont)+'">'+precioLabel+'</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;min-width:0">'+cuotas+'</div></div>'+sep;
   }
 
   var lineas=v.tit.split('|');
