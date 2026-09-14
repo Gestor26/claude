@@ -180,8 +180,16 @@
       </select>
       <label for="c-pesos">Pesos</label>
       <input type="number" id="c-pesos" inputmode="decimal" placeholder="1.000.000" step="any">
-      <label for="c-cot">Cotización (ARS por USD)</label>
-      <input type="number" id="c-cot" inputmode="decimal" placeholder="1550" step="any">
+      <div class="row2">
+        <div>
+          <label for="c-cot-cli">Tu cotización (al cliente)</label>
+          <input type="number" id="c-cot-cli" inputmode="decimal" placeholder="1561" step="any">
+        </div>
+        <div>
+          <label for="c-cot">Cotización de la financiera</label>
+          <input type="number" id="c-cot" inputmode="decimal" placeholder="1550" step="any">
+        </div>
+      </div>
     </div>
 
     <div id="f-tarjeta" hidden>
@@ -442,7 +450,7 @@ function fillDefaults(){
     if(!$('#t-cot').value) $('#t-cot').value = state.config.lastCot;
     if(!$('#tr-cot').value) $('#tr-cot').value = state.config.lastCot;
   }
-  if(state.config.lastCotCli && !$('#tr-cot-cli').value) $('#tr-cot-cli').value = state.config.lastCotCli;
+  if(state.config.lastCotCli){ if(!$('#tr-cot-cli').value) $('#tr-cot-cli').value = state.config.lastCotCli; if(!$('#c-cot-cli').value) $('#c-cot-cli').value = state.config.lastCotCli; }
   if($('#u-pct').value==='') $('#u-pct').value = state.config.usdtPct;
   if($('#tr-pct').value==='') $('#tr-pct').value = state.config.transfPct;
   if($('#tr-rec').value==='') $('#tr-rec').value = state.config.transfRec ?? 0;
@@ -473,12 +481,15 @@ $('#tr-modo').addEventListener('change', ()=>{ const pct = $('#tr-modo').value==
 function calc(){
   let r = {movs:[], detalle:'', meta:{}, ok:false, lines:[]};
   if(tipo==='compra'){
-    const p=num('#c-pesos'), c=num('#c-cot'), origen=$('#c-origen').value;
+    const p=num('#c-pesos'), c=num('#c-cot'), cc=num('#c-cot-cli'), origen=$('#c-origen').value;
     if(p>0 && c>0){ const usd=p/c; r.ok=true;
-      r.detalle = `${fmtARS(p)} a ${c.toLocaleString('es-AR')}${origen==='cuenta'?' · con pesos de la cuenta':''}`; r.meta={pesos:p,cot:c,origen};
+      r.detalle = `${fmtARS(p)} a ${c.toLocaleString('es-AR')}${cc?' (cliente '+cc.toLocaleString('es-AR')+')':''}${origen==='cuenta'?' · con pesos de la cuenta':''}`; r.meta={pesos:p,cot:c,origen};
       if(origen==='cuenta') r.movs.push({moneda:'ARS',debe:p,haber:0});
       r.movs.push({moneda:'USD',debe:0,haber:usd});
-      r.lines=[[origen==='cuenta'?'Pesos que salen de la cuenta':'Pesos entregados',fmtARS(p),origen==='cuenta'?'debe':''],['Cotización',c.toLocaleString('es-AR')],['Te acreditan',fmtUSD(usd),'haber']]; }
+      r.lines=[[origen==='cuenta'?'Pesos que salen de la cuenta':'Pesos entregados',fmtARS(p),origen==='cuenta'?'debe':''],[`Financiera te da a ${c.toLocaleString('es-AR')}`,fmtUSD(usd),'haber']];
+      if(cc>0){ const usdCli=p/cc, gan=usd-usdCli; r.meta.cotCli=cc; r.meta.ganUSD=gan; r.meta.ganARS=gan*cc;
+        r.lines.splice(1,0,[`Al cliente se los tomaste a ${cc.toLocaleString('es-AR')}`,fmtUSD(usdCli)]);
+        r.lines.push(['Tu ganancia',`${fmtUSD(gan)} ≈ ${fmtARS(gan*cc)}`,gan>=0?'haber':'debe']); } }
   }
   if(tipo==='tarjeta'){
     const p=num('#t-pesos'), coef=num('#t-pct'), c=num('#t-cot'), q=$('#t-cuotas').value, rec=num('#t-rec');
@@ -569,7 +580,7 @@ function empezarEdicion(o){
   setTipo(o.tipo);
   $('#fecha').value = o.fecha;
   const put = (id,v) => { $(id).value = (v===undefined||v===null) ? '' : v; };
-  if(o.tipo==='compra'){ put('#c-pesos',m.pesos); put('#c-cot',m.cot); $('#c-origen').value = m.origen||'llevo'; }
+  if(o.tipo==='compra'){ put('#c-pesos',m.pesos); put('#c-cot',m.cot); put('#c-cot-cli',m.cotCli); $('#c-origen').value = m.origen||'llevo'; }
   if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); put('#t-rec', m.recargo ?? 0); put('#t-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); }
   if(o.tipo==='entrega'){ put('#e-usd',o.haber); put('#e-det',m.det); }
   if(o.tipo==='usdt'){ put('#u-usd',m.usd); put('#u-pct',m.pct); put('#u-prov',m.prov); }
