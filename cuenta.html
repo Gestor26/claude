@@ -166,6 +166,7 @@
       <button data-t="entrega">Entrega de USD<small>Efectivo a cuenta</small></button>
       <button data-t="usdt">Envío USDT<small>A un proveedor</small></button>
       <button data-t="transf">Transferencia<small>Comprobante del cliente</small></button>
+      <button data-t="ganancia">Ganancia extra<small>Operación por afuera</small></button>
       <button data-t="ajuste">Ajuste manual<small>Corrección +/−</small></button>
     </div>
 
@@ -291,6 +292,24 @@
       <input type="text" id="tr-det" placeholder="Nombre del cliente, equipo…">
     </div>
 
+    <div id="f-ganancia" hidden>
+      <div class="row2">
+        <div>
+          <label for="ga-monto">Ganancia</label>
+          <input type="number" id="ga-monto" inputmode="decimal" placeholder="15.000" step="any">
+        </div>
+        <div>
+          <label for="ga-mon">Moneda</label>
+          <select id="ga-mon"><option value="ARS">ARS</option><option value="USD">USD</option></select>
+        </div>
+      </div>
+      <label for="ga-cot">Cotización (para pasar a la otra moneda)</label>
+      <input type="number" id="ga-cot" inputmode="decimal" placeholder="1550" step="any">
+      <label for="ga-det">Detalle</label>
+      <input type="text" id="ga-det" placeholder="Qué operación fue">
+      <p class="hint">No mueve el saldo de la cuenta con la financiera: solo suma a tu apartado de ganancias.</p>
+    </div>
+
     <div id="f-ajuste" hidden>
       <div class="row2">
         <div>
@@ -321,6 +340,7 @@
         <option value="entrega">Entrega de USD</option>
         <option value="usdt">Envío USDT</option>
         <option value="transf">Transferencia</option>
+        <option value="ganancia">Ganancia extra</option>
         <option value="ajuste">Ajuste</option>
       </select>
       <input type="month" id="fMes">
@@ -378,8 +398,8 @@ const fmtPct = n => n.toLocaleString('es-AR',{maximumFractionDigits:2}) + '%';
 const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? 0 : v; };
 const today = () => new Date().toISOString().slice(0,10);
 const fmtFecha = iso => { const [y,m,d] = iso.split('-'); return `${d}/${m}/${y.slice(2)}`; };
-const NOMBRE = {compra:'Compra de dólares', tarjeta:'Cobro posnet', entrega:'Entrega USD', usdt:'Envío USDT', transf:'Transferencia', ajuste:'Ajuste'};
-const TIPOS = ['compra','tarjeta','entrega','usdt','transf','ajuste'];
+const NOMBRE = {compra:'Compra de dólares', tarjeta:'Cobro posnet', entrega:'Entrega USD', usdt:'Envío USDT', transf:'Transferencia', ganancia:'Ganancia extra', ajuste:'Ajuste'};
+const TIPOS = ['compra','tarjeta','entrega','usdt','transf','ganancia','ajuste'];
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2400); }
 function setLoading(on){ document.body.classList.toggle('loading', on); }
@@ -449,6 +469,7 @@ function fillDefaults(){
     if(!$('#c-cot').value) $('#c-cot').value = state.config.lastCot;
     if(!$('#t-cot').value) $('#t-cot').value = state.config.lastCot;
     if(!$('#tr-cot').value) $('#tr-cot').value = state.config.lastCot;
+    if(!$('#ga-cot').value) $('#ga-cot').value = state.config.lastCot;
   }
   if(state.config.lastCotCli){ if(!$('#tr-cot-cli').value) $('#tr-cot-cli').value = state.config.lastCotCli; if(!$('#c-cot-cli').value) $('#c-cot-cli').value = state.config.lastCotCli; }
   if($('#u-pct').value==='') $('#u-pct').value = state.config.usdtPct;
@@ -529,6 +550,13 @@ function calc(){
         if(rec>0) r.lines.splice(2,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',fmtARS(gan),gan>=0?'haber':'debe']); }
     }
   }
+  if(tipo==='ganancia'){
+    const g=num('#ga-monto'), mon=$('#ga-mon').value, c=num('#ga-cot'), det=$('#ga-det').value.trim();
+    if(g>0){ r.ok=true; const ganARS = mon==='ARS' ? g : (c>0 ? g*c : 0), ganUSD = mon==='USD' ? g : (c>0 ? g/c : 0);
+      r.detalle = det || 'Operación por afuera'; r.meta={det,moneda:mon,monto:g,cot:c||null,ganARS,ganUSD,extra:true};
+      r.movs.push({moneda:mon,debe:0,haber:0});
+      r.lines=[['Ganancia',fmtMon(mon,g),'haber']]; if(c>0) r.lines.push([mon==='ARS'?'Equivale a':'Equivale a', mon==='ARS'?fmtUSD(ganUSD):fmtARS(ganARS)]); }
+  }
   if(tipo==='ajuste'){
     const a=num('#a-usd'), mon=$('#a-mon').value;
     if(a!==0){ r.ok=true; const det=$('#a-det').value.trim(); r.detalle=det||'Ajuste'; r.meta={det};
@@ -563,7 +591,7 @@ $('#btnAdd').addEventListener('click', async () => {
   if(r.meta.cot){ state.config.lastCot = r.meta.cot; } if(r.meta.cotCli){ state.config.lastCotCli = r.meta.cotCli; } if(r.meta.cot||r.meta.cotCli) guardarConfig();
   toast(editando ? 'Movimiento actualizado' : 'Operación registrada');
   terminarEdicion(false);
-  ['#c-pesos','#t-pesos','#t-base','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-base','#tr-det'].forEach(s=>$(s).value='');
+  ['#c-pesos','#t-pesos','#t-base','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-base','#tr-det','#ga-monto','#ga-det'].forEach(s=>$(s).value='');
   limpiarComprobante(); renderPreview(); cargar();
 });
 
@@ -587,6 +615,7 @@ function empezarEdicion(o){
   if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); put('#tr-rec', m.recargo ?? 0); put('#tr-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
     $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot',m.cot); put('#tr-cot-cli',m.cotCli); put('#tr-pct',m.pct);
     compActual = m.comprobante ? {path:m.comprobante} : null; $('#dropPrev').innerHTML=''; $('#ocrStatus').textContent = m.comprobante ? 'Se conserva el comprobante ya guardado.' : ''; }
+  if(o.tipo==='ganancia'){ put('#ga-monto',m.monto); $('#ga-mon').value = m.moneda||'ARS'; put('#ga-cot',m.cot); put('#ga-det',m.det); }
   if(o.tipo==='ajuste'){ put('#a-usd', o.haber ? o.haber : -o.debe); $('#a-mon').value = o.moneda||'USD'; put('#a-det',m.det); }
   $('#asideTitle').textContent = 'Editar operación'; $('#editBanner').hidden = false; $('#btnAdd').textContent = 'Guardar cambios';
   renderPreview(); render();
@@ -595,7 +624,7 @@ function empezarEdicion(o){
 function terminarEdicion(limpiar=true){
   editando = null;
   $('#asideTitle').textContent = 'Nueva operación'; $('#editBanner').hidden = true; $('#btnAdd').textContent = 'Registrar operación';
-  if(limpiar){ ['#c-pesos','#t-pesos','#t-base','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-base','#tr-det'].forEach(s=>$(s).value=''); limpiarComprobante(); $('#fecha').value = today(); renderPreview(); render(); }
+  if(limpiar){ ['#c-pesos','#t-pesos','#t-base','#t-det','#e-usd','#e-det','#u-usd','#u-prov','#a-usd','#a-det','#tr-pesos','#tr-base','#tr-det','#ga-monto','#ga-det'].forEach(s=>$(s).value=''); limpiarComprobante(); $('#fecha').value = today(); renderPreview(); render(); }
 }
 $('#editCancel').addEventListener('click', ()=>terminarEdicion(true));
 
@@ -654,7 +683,8 @@ function render(){
   if(vis.some(o=>o.meta?.ganARS)) partes.push(`<span>Tu ganancia: <b class="num">${fmtARS(gA)}</b>${gU?` <span style="color:var(--ink-2)">(≈ ${fmtUSD(gU)} en las operaciones con cotización)</span>`:''}</span>`);
   $('#totals').innerHTML = partes.join('');
   const mesAct = today().slice(0,7), gMes = all.filter(o=>o.fecha.startsWith(mesAct)).reduce((s,o)=>s+(o.meta?.ganARS||0),0), gTot = all.reduce((s,o)=>s+(o.meta?.ganARS||0),0);
-  const gEl = $('#gananciaTxt'); gEl.hidden = !gTot; if(gTot) gEl.innerHTML = `Tu ganancia por recargos: <b class="num" style="color:var(--green)">${fmtARS(gMes)}</b> este mes · ${fmtARS(gTot)} histórico`;
+  const gExMes = all.filter(o=>o.fecha.startsWith(mesAct) && o.meta?.extra).reduce((s,o)=>s+(o.meta?.ganARS||0),0);
+  const gEl = $('#gananciaTxt'); gEl.hidden = !gTot; if(gTot) gEl.innerHTML = `Tu ganancia: <b class="num" style="color:var(--green)">${fmtARS(gMes)}</b> este mes${gExMes?` <span style="color:var(--ink-2)">(${fmtARS(gMes-gExMes)} por recargos + ${fmtARS(gExMes)} extras)</span>`:''} · ${fmtARS(gTot)} histórico`;
 
   if(!vis.length){
     $('#ledgerWrap').innerHTML = `<div class="empty">${all.length?'Ningún movimiento coincide con el filtro.':'Cargá la primera operación desde el panel de la izquierda.'}</div>`;
@@ -665,7 +695,7 @@ function render(){
       <td class="num">${fmtFecha(o.fecha)}</td>
       <td><span class="tag">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.pendiente?'<span class="tag" style="background:#F6E7C8;color:#7A4E00;margin-left:4px">Pendiente</span>':''}${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}${o.meta?.ganARS?` · <span style="color:var(--green)">ganancia ${fmtARS(o.meta.ganARS)}</span>`:''}</span></td>
       <td class="n num debe">${o.debe?fmtMon(o.moneda,o.debe):''}</td>
-      <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):''}</td>
+      <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):(o.tipo==='ganancia'?`<span style="color:var(--ink-2);font-style:italic">no mueve saldo</span>`:'')}</td>
       <td class="n num saldo ${saldoUSD[o.id]<0?'neg':''}">${fmtUSD(saldoUSD[o.id])}</td>
       ${hayArs?`<td class="n num saldo ${saldoARS[o.id]<0?'neg':''}">${fmtARS(saldoARS[o.id])}</td>`:''}
       <td style="white-space:nowrap">${o.meta?.pendiente?`<button class="liq-row" data-id="${o.id}" title="Marcar como liquidado">Liquidar</button>`:''}<button class="edit" data-id="${o.id}" title="Editar">✎</button><button class="del" data-id="${o.id}" title="Eliminar">×</button></td>
