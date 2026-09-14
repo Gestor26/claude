@@ -83,6 +83,13 @@
   .pend li .liq{background:var(--green);color:#fff;border:0;border-radius:var(--r);padding:5px 10px;cursor:pointer;font-size:.82rem;white-space:nowrap}
   .pend .dias{color:var(--ink-2);font-size:.82rem}
   .pend .dias.tarde{color:var(--red)}
+  .vistas{display:flex;gap:4px;margin:0 0 14px;border-bottom:1px solid var(--line)}
+  .vistas button{background:none;border:0;border-bottom:3px solid transparent;padding:8px 14px;cursor:pointer;color:var(--ink-2);font-weight:500}
+  .vistas button.on{color:var(--ink);border-bottom-color:var(--green)}
+  .gan-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:0 0 16px}
+  .gan-cards div{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+  .gan-cards .k{font-size:.8rem;color:var(--ink-2)} .gan-cards .v{font-size:1.25rem;font-weight:600;color:var(--green)}
+  .gan-cards .v small{font-size:.8rem;font-weight:400;color:var(--ink-2)}
   .ledger .liq-row{background:var(--green);color:#fff;border:0;border-radius:var(--r);padding:4px 9px;cursor:pointer;font-size:.8rem;margin-right:6px;vertical-align:middle}
   .ledger .del:hover{color:var(--red)}
   .empty{padding:36px 20px;text-align:center;color:var(--ink-2);background:#fff;border:1px dashed var(--line)}
@@ -331,7 +338,7 @@
   </aside>
 
   <section>
-    <h2>Movimientos</h2>
+    <div class="vistas"><button class="on" data-v="movs">Movimientos</button><button data-v="gan">Ganancias</button></div>
     <div class="filters">
       <select id="fTipo">
         <option value="">Todos los tipos</option>
@@ -346,9 +353,15 @@
       <input type="month" id="fMes">
       <input type="search" id="fTxt" placeholder="Buscar proveedor o detalle">
     </div>
-    <div id="pendBox"></div>
-    <div class="totals" id="totals"></div>
-    <div class="wrap" id="ledgerWrap"></div>
+    <div id="vMovs">
+      <div id="pendBox"></div>
+      <div class="totals" id="totals"></div>
+      <div class="wrap" id="ledgerWrap"></div>
+    </div>
+    <div id="vGan" hidden>
+      <div class="gan-cards" id="ganCards"></div>
+      <div class="wrap" id="ganWrap"></div>
+    </div>
   </section>
 </main>
 
@@ -669,6 +682,7 @@ function render(){
   all.forEach(o => { if(!o.meta?.pendiente){ if(o.moneda==='ARS') ars += o.haber - o.debe; else usd += o.haber - o.debe; } saldoUSD[o.id] = usd; saldoARS[o.id] = ars; });
   renderPendientes(all);
   fraseSaldo($('#saldoTxt'), 'USD', usd);
+  if(vista==='gan') renderGanancias(all);
   const hayArs = all.some(o=>o.moneda==='ARS');
   $('#saldoArs').hidden = !hayArs; if(hayArs) fraseSaldo($('#saldoArs'), 'ARS', ars);
   $('#saldoSub').textContent = all.length ? `${all.length} ${all.length===1?'movimiento':'movimientos'} registrados.` : 'Todavía no cargaste operaciones.';
@@ -705,6 +719,35 @@ function render(){
     <tbody>${rows}</tbody></table>`;
 }
 ['#fTipo','#fMes','#fTxt'].forEach(s => $(s).addEventListener('input', render));
+
+// ---------- vista Ganancias ----------
+let vista = 'movs';
+$('.vistas').addEventListener('click', e => { const b=e.target.closest('button'); if(!b) return; vista=b.dataset.v;
+  document.querySelectorAll('.vistas button').forEach(x=>x.classList.toggle('on', x===b));
+  $('#vMovs').hidden = vista!=='movs'; $('#vGan').hidden = vista!=='gan'; render(); });
+const ORIGEN = {tarjeta:'Recargo tarjeta', transf:'Recargo transferencia', compra:'Diferencia de cotización', ganancia:'Extra'};
+function renderGanancias(all){
+  const ft=$('#fTipo').value, fm=$('#fMes').value, fx=$('#fTxt').value.trim().toLowerCase();
+  const vistos = new Set(); const con = all.filter(o => { if(!(o.meta?.ganARS||o.meta?.ganUSD)) return false; const g=o.meta?.grupo; if(g){ if(vistos.has(g)) return false; vistos.add(g); } return true; });
+  const vis = con.filter(o => (!ft||o.tipo===ft) && (!fm||o.fecha.startsWith(fm)) && (!fx||o.detalle.toLowerCase().includes(fx)));
+  const sA = arr => arr.reduce((s,o)=>s+(o.meta?.ganARS||0),0), sU = arr => arr.reduce((s,o)=>s+(o.meta?.ganUSD||0),0);
+  const mesAct = today().slice(0,7);
+  const cards = [
+    ['Este mes', sA(con.filter(o=>o.fecha.startsWith(mesAct))), sU(con.filter(o=>o.fecha.startsWith(mesAct)))],
+    ['Histórico', sA(con), sU(con)],
+    ...Object.keys(ORIGEN).map(t => [ORIGEN[t], sA(vis.filter(o=>o.tipo===t)), sU(vis.filter(o=>o.tipo===t))]).filter(c=>c[1]||c[2]),
+  ];
+  $('#ganCards').innerHTML = cards.map(c=>`<div><div class="k">${c[0]}</div><div class="v num">${fmtARS(c[1])}${c[2]?`<br><small>≈ ${fmtUSD(c[2])}</small>`:''}</div></div>`).join('');
+  if(!vis.length){ $('#ganWrap').innerHTML = `<div class="empty">${con.length?'Ninguna ganancia coincide con el filtro.':'Todavía no hay operaciones con ganancia. Se calcula cuando cargás el recargo al cliente o tu cotización.'}</div>`; return; }
+  const rows = [...vis].reverse().map(o => `<tr>
+      <td class="num">${fmtFecha(o.fecha)}</td>
+      <td><span class="tag">${ORIGEN[o.tipo]||NOMBRE[o.tipo]}</span><span class="det">${esc(o.detalle)}</span></td>
+      <td class="n num haber">${o.meta?.ganARS?fmtARS(o.meta.ganARS):''}</td>
+      <td class="n num" style="color:var(--ink-2)">${o.meta?.ganUSD?fmtUSD(o.meta.ganUSD):''}</td>
+    </tr>`).join('');
+  $('#ganWrap').innerHTML = `<table class="ledger"><thead><tr><th>Fecha</th><th>Origen</th><th class="n">Ganancia ARS</th><th class="n">≈ USD</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td></td><td style="font-weight:600">Total de lo filtrado</td><td class="n num haber" style="font-weight:600">${fmtARS(sA(vis))}</td><td class="n num" style="color:var(--ink-2)">${fmtUSD(sU(vis))}</td></tr></tfoot></table>`;
+}
 $('#ledgerWrap').addEventListener('click', async e => {
   const a = e.target.closest('.adj');
   if(a){ e.preventDefault(); const { data, error } = await sb.storage.from('comprobantes').createSignedUrl(a.dataset.path, 300);
