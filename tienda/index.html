@@ -366,6 +366,7 @@ var VIS = {
 };
 
 var ORDEN = {
+  'iphone 18 pro max':124,'iphone 18 pro':123,'iphone 18 air':122,'iphone 18 fold':125,'iphone 18':120,'iphone 18e':119,'iphone 18 e':119,
   'iphone 17 pro max':104,'iphone 17 pro':103,'iphone 17 air':102,'iphone 17':100,'iphone 17e':99,'iphone 17 e':99,
   'iphone 16 pro max':96,'iphone 16 pro':95,'iphone 16 plus':94,'iphone 16e':91,'iphone 16 e':91,'iphone 16':93,
   'iphone 15 pro max':86,'iphone 15 pro':85,'iphone 15 plus':84,'iphone 15':83,
@@ -1099,7 +1100,7 @@ function fmt(n){var v=Math.floor(n/1000)*1000,s=String(v);if(s.length>6)s=s.slic
 function fmtExacto(n){var s=String(Math.round(n||0)),r='';while(s.length>3){r='.'+s.slice(-3)+r;s=s.slice(0,-3);}return '$'+s+r;}
 function pxUSD(s){return parseInt((s||'').replace(/[$, ]/g,''))||0;}
 function capGB(s){var sl=(s||'').toLowerCase();if(sl.indexOf('tb')>=0){var m=sl.match(/(\d+)/);return m?parseInt(m[1])*1024:1024;}var m=sl.match(/(\d+)/);return m?parseInt(m[1]):0;}
-function numIP(n){var nl=n.toLowerCase().trim(),keys=Object.keys(ORDEN).sort(function(a,b){return b.length-a.length;});for(var i=0;i<keys.length;i++)if(nl.indexOf(keys[i])>=0)return ORDEN[keys[i]];var m=n.match(/iphone\s*(\d+)/i);return m?parseInt(m[1]):0;}
+function numIP(n){var nl=n.toLowerCase().trim(),keys=Object.keys(ORDEN).sort(function(a,b){return b.length-a.length;});for(var i=0;i<keys.length;i++)if(nl.indexOf(keys[i])>=0)return ORDEN[keys[i]];var m=n.match(/iphone\s*(\d+)/i);if(!m)return 0;var g=parseInt(m[1]),b=g*10+60;if(/pro\s*max/.test(nl))return b+4;if(/\bpro\b/.test(nl))return b+3;if(/\bair\b|\bplus\b/.test(nl))return b+2;if(/\d\s?e\b/.test(nl))return b-1;return b;}
 function dedup(arr,kfn){var s={};return arr.filter(function(x){var k=kfn(x);if(s[k])return false;s[k]=true;return true;});}
 
 function parseCSV(txt){
