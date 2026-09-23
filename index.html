@@ -10,10 +10,18 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Farroyo">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#17231C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Farroyo">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{--paper:#F1F4EC;--ink:#1B2A22;--ink-2:#4A5A50;--line:#C9D2C3;--green:#1E6B45}
+  :root{padding-top:env(safe-area-inset-top,0px);--paper:#F1F4EC;--ink:#1B2A22;--ink-2:#4A5A50;--line:#C9D2C3;--green:#1E6B45}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif}
   body{display:flex;flex-direction:column}
@@ -51,6 +59,7 @@
   document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) show(b.dataset.s); });
   if(['tienda','wsp','gastos'].includes(ir)) show(ir);
   window.addEventListener('message', e=>{ if(e.data && e.data.farroyo) show(e.data.farroyo); });
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
