@@ -611,7 +611,12 @@ function calc(){
     const p=num('#tr-pesos'), modo=$('#tr-modo').value, det=$('#tr-det').value.trim(), rec=num('#tr-rec');
     const comp = compActual?compActual.path:null, base = p/(1+rec/100);
     if(modo==='cot'){ const c=num('#tr-cot'), cc=num('#tr-cot-cli')||c;
-      if(p>0 && c>0){ const usd=p/c, usdBase=base/cc, gan=usd-usdBase; r.ok=true;
+      if(p>0 && !(c>0)){ r.ok=true;
+        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} · falta cotización de la financiera`;
+        r.meta={pesos:p,cotCli:cc||null,modo,det,comprobante:comp,recargo:rec,pendiente:true,sinCot:true};
+        r.movs.push({moneda:'USD',debe:0,haber:0});
+        r.lines=[['Transferido',fmtARS(p)],[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Queda pendiente','hasta que cargues la cotización','debe']]; }
+      else if(p>0 && c>0){ const usd=p/c, usdBase=base/cc, gan=usd-usdBase; r.ok=true;
         r.detalle=`${det||'Cliente'} · ${fmtARS(p)} · tuya ${cc.toLocaleString('es-AR')} / financiera ${c.toLocaleString('es-AR')}`;
         r.meta={pesos:p,cot:c,cotCli:cc,modo,det,comprobante:comp,recargo:rec,ganUSD:gan,ganARS:gan*cc};
         r.movs.push({moneda:'USD',debe:0,haber:usd});
@@ -709,19 +714,31 @@ function renderPendientes(all){
   const box = $('#pendBox'), kp = $('#kpiPend');
   if(!pend.length){ box.innerHTML=''; kp.hidden = true; return; }
   const tot = pend.reduce((s,o)=>s+o.haber,0);
-  kp.hidden = false; kp.querySelector('.v').textContent = fmtUSD(tot); kp.querySelector('.s').textContent = `${pend.length} ${pend.length===1?'cobro con tarjeta':'cobros con tarjeta'} sin acreditar`;
+  kp.hidden = false; kp.querySelector('.v').textContent = fmtUSD(tot); kp.querySelector('.s').textContent = `${pend.length} ${pend.length===1?'operación':'operaciones'} sin acreditar${pend.some(o=>o.meta?.sinCot)?' · hay transferencias sin cotización':''}`;
   const hoy = new Date(today());
+  const sinCot = pend.filter(o=>o.meta?.sinCot), arsPend = sinCot.reduce((s,o)=>s+(o.meta?.pesos||0),0);
   const items = pend.map(o => {
     const d = Math.round((hoy - new Date(o.fecha))/86400000);
-    return `<li><span><b class="num">${fmtUSD(o.haber)}</b> <span style="color:var(--ink-2)">· ${fmtFecha(o.fecha)} · ${esc(o.detalle)}</span> <span class="dias ${d>4?'tarde':''}">${d===0?'hoy':d===1?'hace 1 día':'hace '+d+' días'}</span></span><button class="liq" data-id="${o.id}">✓ Liquidado</button></li>`;
+    const monto = o.meta?.sinCot ? `<b class="num">${fmtARS(o.meta.pesos)}</b> <span class="tag pendiente">falta cotización</span>` : `<b class="num">${fmtUSD(o.haber)}</b>`;
+    return `<li><span>${monto} <span style="color:var(--ink-2)">· ${fmtFecha(o.fecha)} · ${esc(o.detalle)}</span> <span class="dias ${d>4?'tarde':''}">${d===0?'hoy':d===1?'hace 1 día':'hace '+d+' días'}</span></span><button class="liq" data-id="${o.id}">${o.meta?.sinCot?'Cargar cotización':'✓ Liquidado'}</button></li>`;
   }).join('');
-  box.innerHTML = `<div class="pend"><h3><span>Pendiente de liquidación: <span class="num">${fmtUSD(tot)}</span> <span style="color:var(--ink-2);font-weight:400">(${pend.length} ${pend.length===1?'cobro con tarjeta':'cobros con tarjeta'}, no suman al saldo todavía)</span></span><button id="liqTodo">Liquidar todo</button></h3><ul>${items}</ul></div>`;
+  const resumen = [tot?fmtUSD(tot):null, arsPend?fmtARS(arsPend)+' sin cotizar':null].filter(Boolean).join(' + ');
+  box.innerHTML = `<div class="pend"><h3><span>Pendiente de liquidación: <span class="num">${resumen}</span> <span style="color:var(--ink-2);font-weight:400">(${pend.length} ${pend.length===1?'operación':'operaciones'}, no suman al saldo todavía)</span></span><button id="liqTodo">Liquidar todo</button></h3><ul>${items}</ul></div>`;
 }
 async function liquidar(ids){
   const ops = state.ops.filter(o=>ids.includes(o.id));
   for(const o of ops){
-    const meta = {...o.meta, pendiente:false, liquidado:today()};
-    const { error } = await sb.from('movimientos').update({ meta }).eq('id', o.id);
+    let meta = {...o.meta, pendiente:false, liquidado:today()}, cambios = { meta };
+    if(o.meta?.sinCot){
+      const txt = prompt(`Cotización de la financiera para ${fmtARS(o.meta.pesos)} (${o.detalle.split(' · ')[0]}):`, state.config.lastCot || '');
+      if(txt===null) continue; const c = parseFloat(String(txt).replace(',','.'));
+      if(!(c>0)){ toast('Cotización inválida, esa operación quedó pendiente.'); continue; }
+      const p=o.meta.pesos, rec=o.meta.recargo||0, cc=o.meta.cotCli||c, base=p/(1+rec/100), usd=p/c, gan=usd-base/cc;
+      meta = {...meta, cot:c, cotCli:cc, sinCot:false, ganUSD:gan, ganARS:gan*cc};
+      cambios = { meta, haber:+usd.toFixed(2), detalle:`${o.detalle.split(' · ')[0]} · ${fmtARS(p)} · tuya ${cc.toLocaleString('es-AR')} / financiera ${c.toLocaleString('es-AR')}` };
+      state.config.lastCot = c; guardarConfig();
+    }
+    const { error } = await sb.from('movimientos').update(cambios).eq('id', o.id);
     if(error){ toast('No se pudo liquidar: ' + error.message); return; }
   }
   toast(ops.length===1 ? 'Cobro liquidado, ya suma al saldo' : `${ops.length} cobros liquidados`); cargar();
@@ -774,7 +791,7 @@ function render(){
       <td class="num">${fmtFecha(o.fecha)}</td>
       <td><span class="tag" data-t="${o.tipo}">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.pendiente?'<span class="tag pendiente">Pendiente</span>':''}${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}${o.meta?.ganARS?` · <span style="color:var(--green)">ganancia ${fmtARS(o.meta.ganARS)}</span>`:''}</span></td>
       <td class="n num debe">${o.debe?fmtMon(o.moneda,o.debe):''}</td>
-      <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):((o.tipo==='ganancia'||o.meta?.externo)?`<span style="color:var(--ink-2);font-style:italic">no mueve saldo</span>`:'')}</td>
+      <td class="n num haber">${o.haber?fmtMon(o.moneda,o.haber):(o.meta?.sinCot?`<span style="color:var(--ink-2);font-style:italic">falta cotización</span>`:(o.tipo==='ganancia'||o.meta?.externo)?`<span style="color:var(--ink-2);font-style:italic">no mueve saldo</span>`:'')}</td>
       <td class="n num saldo ${saldoUSD[o.id]<0?'neg':''}">${fmtUSD(saldoUSD[o.id])}</td>
       ${hayArs?`<td class="n num saldo ${saldoARS[o.id]<0?'neg':''}">${fmtARS(saldoARS[o.id])}</td>`:''}
       <td class="acciones">${o.meta?.pendiente?`<button class="liq-row" data-id="${o.id}" title="Marcar como liquidado">Liquidar</button>`:''}<button class="edit" data-id="${o.id}" title="Editar">✎</button><button class="del" data-id="${o.id}" title="Eliminar">×</button></td>
