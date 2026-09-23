@@ -138,6 +138,13 @@
   .ledger .liq-row{background:var(--green);color:#fff;border:0;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:.78rem;margin-right:6px;vertical-align:middle}
   .ledger .adj{color:var(--blue);text-decoration:none;font-size:.8rem;margin-left:6px}
   .ledger .adj:hover{text-decoration:underline}
+  .selbar{position:sticky;top:60px;z-index:5;background:var(--ink);color:#fff;border-radius:var(--r-sm);padding:10px 14px;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font-size:.9rem;box-shadow:var(--shadow)}
+  .selbar b{font-weight:600} .selbar .h{color:#9ED4B4} .selbar .d{color:#F0A89E}
+  .selbar button{margin-left:auto;background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.85rem}
+  .selbar button:hover{background:rgba(255,255,255,.22)}
+  .ledger td.chk,.ledger th.chk{width:1%;padding-right:4px}
+  .ledger input[type=checkbox]{width:16px;height:16px;margin:2px 0 0;cursor:pointer;accent-color:var(--green)}
+  .ledger tr.marcado td{background:#EEF6F0}
   .empty{padding:40px 20px;text-align:center;color:var(--ink-2);background:var(--surface-2);border:1px dashed var(--line-2);border-radius:var(--r-sm)}
 
   .gan-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:0 0 14px}
@@ -401,6 +408,7 @@
       <input type="search" id="fTxt" placeholder="Buscar proveedor o detalle">
     </div>
     <div id="vMovs">
+      <div id="selBar" hidden></div>
       <div id="pendBox"></div>
       <div class="totals" id="totals"></div>
       <div class="wrap" id="ledgerWrap"></div>
@@ -657,6 +665,7 @@ $('#btnAdd').addEventListener('click', async () => {
 
 // ---------- edición ----------
 let editando = null;
+const seleccion = new Set();
 function setTipo(t){
   tipo = t;
   document.querySelectorAll('#tipos button').forEach(x=>x.classList.toggle('on', x.dataset.t===t));
@@ -754,7 +763,8 @@ function render(){
     return;
   }
   const rows = [...vis].reverse().map(o => `
-    <tr class="${editando && (o.id===editando.id || (o.meta?.grupo && o.meta.grupo===editando.meta?.grupo))?'sel':''} ${o.meta?.pendiente?'pend':''}">
+    <tr class="${editando && (o.id===editando.id || (o.meta?.grupo && o.meta.grupo===editando.meta?.grupo))?'sel':''} ${o.meta?.pendiente?'pend':''} ${seleccion.has(o.id)?'marcado':''}">
+      <td class="chk"><input type="checkbox" class="selchk" data-id="${o.id}" ${seleccion.has(o.id)?'checked':''} aria-label="Seleccionar"></td>
       <td class="num">${fmtFecha(o.fecha)}</td>
       <td><span class="tag" data-t="${o.tipo}">${NOMBRE[o.tipo]||o.tipo}</span>${o.meta?.pendiente?'<span class="tag pendiente">Pendiente</span>':''}${o.meta?.comprobante?`<a href="#" class="adj" data-path="${esc(o.meta.comprobante)}" title="Ver comprobante">📎 comprobante</a>`:''}<span class="det">${esc(o.detalle)}${o.meta?.ganARS?` · <span style="color:var(--green)">ganancia ${fmtARS(o.meta.ganARS)}</span>`:''}</span></td>
       <td class="n num debe">${o.debe?fmtMon(o.moneda,o.debe):''}</td>
@@ -764,9 +774,23 @@ function render(){
       <td class="acciones">${o.meta?.pendiente?`<button class="liq-row" data-id="${o.id}" title="Marcar como liquidado">Liquidar</button>`:''}<button class="edit" data-id="${o.id}" title="Editar">✎</button><button class="del" data-id="${o.id}" title="Eliminar">×</button></td>
     </tr>`).join('');
   $('#ledgerWrap').innerHTML = `<table class="ledger">
-    <thead><tr><th>Fecha</th><th>Operación</th><th class="n">Debe</th><th class="n">Haber</th><th class="n">Saldo USD</th>${hayArs?'<th class="n">Saldo ARS</th>':''}<th></th></tr></thead>
+    <thead><tr><th class="chk"><input type="checkbox" id="selAll" title="Seleccionar todo lo visible" ${vis.length && vis.every(o=>seleccion.has(o.id))?'checked':''}></th><th>Fecha</th><th>Operación</th><th class="n">Debe</th><th class="n">Haber</th><th class="n">Saldo USD</th>${hayArs?'<th class="n">Saldo ARS</th>':''}<th></th></tr></thead>
     <tbody>${rows}</tbody></table>`;
+  renderSeleccion();
 }
+function renderSeleccion(){
+  const bar = $('#selBar'); const ops = state.ops.filter(o=>seleccion.has(o.id));
+  if(!ops.length){ bar.hidden = true; bar.innerHTML=''; return; }
+  const s = (mon,k) => ops.filter(o=>o.moneda===mon).reduce((a,o)=>a+o[k],0);
+  const gan = ops.reduce((a,o)=>a+(o.meta?.ganARS||0),0);
+  const partes = [`<span><b>${ops.length}</b> ${ops.length===1?'seleccionada':'seleccionadas'}</span>`];
+  if(ops.some(o=>o.moneda==='USD')){ const h=s('USD','haber'), d=s('USD','debe'); partes.push(`<span>USD: <span class="h num">+${fmtUSD(h)}</span> <span class="d num">−${fmtUSD(d)}</span> = <b class="num">${fmtUSD(h-d)}</b></span>`); }
+  if(ops.some(o=>o.moneda==='ARS')){ const h=s('ARS','haber'), d=s('ARS','debe'); partes.push(`<span>ARS: <span class="h num">+${fmtARS(h)}</span> <span class="d num">−${fmtARS(d)}</span> = <b class="num">${fmtARS(h-d)}</b></span>`); }
+  if(gan) partes.push(`<span>Ganancia: <b class="num">${fmtARS(gan)}</b></span>`);
+  partes.push('<button id="selClear">Limpiar</button>');
+  bar.innerHTML = partes.join(''); bar.hidden = false;
+}
+$('#selBar').addEventListener('click', e => { if(e.target.closest('#selClear')){ seleccion.clear(); render(); } });
 ['#fTipo','#fMes','#fTxt'].forEach(s => $(s).addEventListener('input', render));
 
 // ---------- vista Ganancias ----------
@@ -797,6 +821,10 @@ function renderGanancias(all){
   $('#ganWrap').innerHTML = `<table class="ledger"><thead><tr><th>Fecha</th><th>Origen</th><th class="n">Ganancia ARS</th><th class="n">≈ USD</th></tr></thead><tbody>${rows}</tbody>
     <tfoot><tr><td></td><td style="font-weight:600">Total de lo filtrado</td><td class="n num haber" style="font-weight:600">${fmtARS(sA(vis))}</td><td class="n num" style="color:var(--ink-2)">${fmtUSD(sU(vis))}</td></tr></tfoot></table>`;
 }
+$('#ledgerWrap').addEventListener('change', e => {
+  const c = e.target.closest('.selchk'); if(c){ c.checked ? seleccion.add(+c.dataset.id) : seleccion.delete(+c.dataset.id); c.closest('tr').classList.toggle('marcado', c.checked); renderSeleccion(); const all=[...document.querySelectorAll('.selchk')]; const sa=$('#selAll'); if(sa) sa.checked = all.length && all.every(x=>x.checked); return; }
+  if(e.target.id==='selAll'){ document.querySelectorAll('.selchk').forEach(x => { x.checked = e.target.checked; e.target.checked ? seleccion.add(+x.dataset.id) : seleccion.delete(+x.dataset.id); x.closest('tr').classList.toggle('marcado', e.target.checked); }); renderSeleccion(); }
+});
 $('#ledgerWrap').addEventListener('click', async e => {
   const a = e.target.closest('.adj');
   if(a){ e.preventDefault(); const { data, error } = await sb.storage.from('comprobantes').createSignedUrl(a.dataset.path, 300);
