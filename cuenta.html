@@ -162,7 +162,7 @@
   dialog{border:1px solid var(--line);border-radius:14px;padding:22px 24px;max-width:480px;width:calc(100% - 32px);background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
   dialog::backdrop{background:rgba(23,35,28,.45)}
   dialog h2{margin:0 0 6px} dialog p{margin:0 0 10px;color:var(--ink-2);font-size:.9rem}
-  .cuotas-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 10px;align-items:center;font-size:.88rem}
+  .cuotas-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px 10px;align-items:center;font-size:.88rem}
   .cuotas-grid .h{color:var(--ink-3);font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
   .dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
   .dlg-actions button{border:1px solid var(--line-2);background:#fff;border-radius:var(--r-sm);padding:8px 14px;cursor:pointer}
@@ -440,7 +440,7 @@
       <input type="number" id="cfg-transf-rec" step="any">
     </div>
   </div>
-  <label>Posnet por cuotas: coeficiente de la financiera (÷) y recargo al cliente (%)</label>
+  <label>Posnet por cuotas: coeficiente de Jero (÷), coeficiente de Axel (÷) y recargo al cliente (%)</label>
   <div class="cuotas-grid" id="cfgCuotas"></div>
   <div class="dlg-actions">
     <button id="cfgCancel">Cancelar</button>
@@ -459,7 +459,7 @@ const SUPABASE_KEY = 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CUOTAS = [1,3,6,9,12,18,24];
-const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, lastCotCli:null, cuotas:{1:1,3:1.28,6:1.35,9:1.48,12:1.58,18:1,24:1}, recargos:{1:0,3:45,6:55,9:75,12:90,18:0,24:0}, lastCot:null };
+const DEFAULT_CFG = { usdtPct:2.5, transfPct:2.5, transfRec:3, lastCotCli:null, cuotas:{1:1,3:1.28,6:1.35,9:1.48,12:1.58,18:1,24:1}, cuotasAxel:{1:1,3:1.24,6:1.34,9:1.45,12:1.56,18:1.72,24:1.91}, recargos:{1:0,3:45,6:55,9:75,12:90,18:0,24:0}, lastCot:null };
 let state = { config:{...DEFAULT_CFG, cuotas:{...DEFAULT_CFG.cuotas}}, ops:[] };
 let user = null;
 
@@ -507,7 +507,7 @@ async function cargar(){
   if(m.error){ toast('Error al cargar: ' + m.error.message); return; }
   state.ops = m.data.map(r => ({ id:r.id, fecha:r.fecha, tipo:r.tipo, detalle:r.detalle||'', moneda:r.moneda||'USD', debe:+r.debe||0, haber:+r.haber||0, meta:r.meta||{}, por:r.creado_por }));
   const d = c.data?.data || {};
-  state.config = { ...DEFAULT_CFG, ...d, cuotas:{...DEFAULT_CFG.cuotas, ...(d.cuotas||{})}, recargos:{...DEFAULT_CFG.recargos, ...(d.recargos||{})} };
+  state.config = { ...DEFAULT_CFG, ...d, cuotas:{...DEFAULT_CFG.cuotas, ...(d.cuotas||{})}, cuotasAxel:{...DEFAULT_CFG.cuotasAxel, ...(d.cuotasAxel||{})}, recargos:{...DEFAULT_CFG.recargos, ...(d.recargos||{})} };
   // Completar con los valores por defecto los planes que todavía no se configuraron
   let cambio = false;
   [3,6,9,12].forEach(c => { if(!state.config.cuotas[c] || state.config.cuotas[c]===1){ state.config.cuotas[c] = DEFAULT_CFG.cuotas[c]; cambio = true; } if(!state.config.recargos[c]){ state.config.recargos[c] = DEFAULT_CFG.recargos[c]; cambio = true; } });
@@ -550,7 +550,8 @@ function fillDefaults(){
   if($('#tr-rec').value==='') $('#tr-rec').value = state.config.transfRec ?? 0;
   syncCuotaPct();
 }
-function syncCuotaPct(){ const q=$('#t-cuotas').value; $('#t-pct').value = state.config.cuotas[q] ?? 1; $('#t-rec').value = (state.config.recargos||{})[q] ?? 0; }
+function syncCuotaPct(){ const q=$('#t-cuotas').value, axel=$('#t-posnet').value==='Axel'; $('#t-pct').value = (axel ? state.config.cuotasAxel[q] : state.config.cuotas[q]) ?? 1; $('#t-rec').value = (state.config.recargos||{})[q] ?? 0; }
+$('#t-posnet').addEventListener('change', ()=>{ syncCuotaPct(); const p=num('#t-pesos'); if(p>0) $('#t-base').value = Math.round(p/(1+num('#t-rec')/100)*100)/100; renderPreview(); });
 
 (function initCuotas(){
   $('#t-cuotas').innerHTML = CUOTAS.map(c=>`<option value="${c}">${c===1?'1 pago':c+' cuotas'}</option>`).join('');
@@ -689,7 +690,7 @@ function empezarEdicion(o){
   $('#fecha').value = o.fecha;
   const put = (id,v) => { $(id).value = (v===undefined||v===null) ? '' : v; };
   if(o.tipo==='compra'){ put('#c-pesos',m.pesos); put('#c-cot',m.cot); put('#c-cot-cli',m.cotCli); $('#c-origen').value = m.origen||'llevo'; }
-  if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); put('#t-rec', m.recargo ?? 0); $('#t-posnet').value = m.posnet || 'Jero'; put('#t-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); }
+  if(o.tipo==='tarjeta'){ put('#t-pesos',m.pesos); put('#t-cot',m.cot); put('#t-det',m.det); if(m.cuotas) $('#t-cuotas').value = m.cuotas; put('#t-pct', m.coef ?? (state.config.cuotas[m.cuotas]??1)); $('#t-posnet').value = m.posnet || 'Jero'; put('#t-rec', m.recargo ?? 0); put('#t-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); }
   if(o.tipo==='entrega'){ put('#e-usd',o.haber); put('#e-det',m.det); }
   if(o.tipo==='usdt'){ put('#u-usd',m.usd); put('#u-pct',m.pct); put('#u-prov',m.prov); }
   if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); put('#tr-rec', m.recargo ?? 0); put('#tr-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
@@ -870,7 +871,7 @@ $('#btnConfig').addEventListener('click', () => {
   $('#cfg-usdt').value = state.config.usdtPct;
   $('#cfg-transf').value = state.config.transfPct ?? 0;
   $('#cfg-transf-rec').value = state.config.transfRec ?? 0;
-  $('#cfgCuotas').innerHTML = '<div class="h">Plan</div><div class="h">Coeficiente ÷</div><div class="h">Recargo %</div>' + CUOTAS.map(c=>`<div>${c===1?'1 pago':c+' cuotas'}</div><input type="number" step="any" id="cfg-q${c}" value="${state.config.cuotas[c]??1}" aria-label="Coeficiente ${c} cuotas"><input type="number" step="any" id="cfg-r${c}" value="${(state.config.recargos||{})[c]??0}" aria-label="Recargo ${c} cuotas">`).join('');
+  $('#cfgCuotas').innerHTML = '<div class="h">Plan</div><div class="h">Jero ÷</div><div class="h">Axel ÷</div><div class="h">Recargo %</div>' + CUOTAS.map(c=>`<div>${c===1?'1 pago':c+' cuotas'}</div><input type="number" step="any" id="cfg-q${c}" value="${state.config.cuotas[c]??1}" aria-label="Coeficiente Jero ${c} cuotas"><input type="number" step="any" id="cfg-a${c}" value="${(state.config.cuotasAxel||{})[c]??1}" aria-label="Coeficiente Axel ${c} cuotas"><input type="number" step="any" id="cfg-r${c}" value="${(state.config.recargos||{})[c]??0}" aria-label="Recargo ${c} cuotas">`).join('');
   dlg.showModal();
 });
 $('#cfgCancel').addEventListener('click', ()=>dlg.close());
@@ -879,7 +880,8 @@ $('#cfgSave').addEventListener('click', async () => {
   state.config.transfPct = parseFloat($('#cfg-transf').value)||0;
   state.config.transfRec = parseFloat($('#cfg-transf-rec').value)||0;
   state.config.recargos = state.config.recargos || {};
-  CUOTAS.forEach(c => { state.config.cuotas[c] = parseFloat($('#cfg-q'+c).value)||1; state.config.recargos[c] = parseFloat($('#cfg-r'+c).value)||0; });
+  state.config.cuotasAxel = state.config.cuotasAxel || {};
+  CUOTAS.forEach(c => { state.config.cuotas[c] = parseFloat($('#cfg-q'+c).value)||1; state.config.cuotasAxel[c] = parseFloat($('#cfg-a'+c).value)||1; state.config.recargos[c] = parseFloat($('#cfg-r'+c).value)||0; });
   await guardarConfig(); dlg.close(); $('#u-pct').value = state.config.usdtPct; $('#tr-pct').value = state.config.transfPct; $('#tr-rec').value = state.config.transfRec; syncCuotaPct(); renderPreview(); toast('Comisiones guardadas');
 });
 
