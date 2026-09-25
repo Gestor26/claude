@@ -351,8 +351,16 @@
         </div>
       </div>
       <div id="tr-modo-pct" hidden>
-        <label for="tr-pct">Descuento %</label>
-        <input type="number" id="tr-pct" inputmode="decimal" step="any">
+        <div class="row2">
+          <div>
+            <label for="tr-pct">Descuento %</label>
+            <input type="number" id="tr-pct" inputmode="decimal" step="any">
+          </div>
+          <div>
+            <label for="tr-pct-cot">Dólar al que te liquida (opcional)</label>
+            <input type="number" id="tr-pct-cot" inputmode="decimal" step="any" placeholder="Vacío = queda en pesos">
+          </div>
+        </div>
       </div>
       <label for="tr-det">Cliente / detalle</label>
       <input type="text" id="tr-det" placeholder="Nombre del cliente, equipo…">
@@ -622,12 +630,14 @@ function calc(){
         r.meta={pesos:p,cot:c,cotCli:cc,modo,det,comprobante:comp,recargo:rec,ganUSD:gan,ganARS:gan*cc};
         r.movs.push({moneda:'USD',debe:0,haber:usd});
         r.lines=[['Transferido',fmtARS(p)],[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],[`Equivale a tu cotización ${cc.toLocaleString('es-AR')}`,fmtUSD(usdBase)],[`Financiera acredita a ${c.toLocaleString('es-AR')}`,fmtUSD(usd),'haber'],['Tu ganancia',`${fmtUSD(gan)} ≈ ${fmtARS(gan*cc)}`,gan>=0?'haber':'debe']]; }
-    } else { const pct=num('#tr-pct');
+    } else { const pct=num('#tr-pct'), c2=num('#tr-pct-cot');
       if(p>0){ const desc=p*pct/100, neto=p-desc, gan=neto-base; r.ok=true;
-        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} − ${fmtPct(pct)}`; r.meta={pesos:p,pct,modo,det,comprobante:comp,recargo:rec,ganARS:gan};
-        r.movs.push({moneda:'ARS',debe:0,haber:neto});
-        r.lines=[['Transferido',fmtARS(p)],[`Descuento ${fmtPct(pct)}`,'− '+fmtARS(desc)],['Te acreditan en pesos',fmtARS(neto),'haber']];
-        if(rec>0) r.lines.splice(2,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',fmtARS(gan),gan>=0?'haber':'debe']); }
+        r.detalle=`${det||'Cliente'} · ${fmtARS(p)} − ${fmtPct(pct)}${c2>0?' a '+c2.toLocaleString('es-AR'):''}`;
+        r.meta={pesos:p,pct,modo,det,comprobante:comp,recargo:rec,ganARS:gan};
+        r.lines=[['Transferido',fmtARS(p)],[`Descuento ${fmtPct(pct)}`,'− '+fmtARS(desc)],['Neto en pesos',fmtARS(neto)]];
+        if(c2>0){ const usd=neto/c2; r.meta.cot=c2; r.meta.ganUSD=gan/c2; r.movs.push({moneda:'USD',debe:0,haber:usd}); r.lines.push([`Te acreditan a ${c2.toLocaleString('es-AR')}`,fmtUSD(usd),'haber']); }
+        else { r.movs.push({moneda:'ARS',debe:0,haber:neto}); r.lines[2]=['Te acreditan en pesos',fmtARS(neto),'haber']; }
+        if(rec>0) r.lines.splice(2,0,[`Precio base (sin el +${fmtPct(rec)})`,fmtARS(base)],['Tu ganancia',fmtARS(gan)+(c2>0?` ≈ ${fmtUSD(gan/c2)}`:''),gan>=0?'haber':'debe']); }
     }
   }
   if(tipo==='ganancia'){
@@ -694,7 +704,7 @@ function empezarEdicion(o){
   if(o.tipo==='entrega'){ put('#e-usd',o.haber); put('#e-det',m.det); }
   if(o.tipo==='usdt'){ put('#u-usd',m.usd); put('#u-pct',m.pct); put('#u-prov',m.prov); }
   if(o.tipo==='transf'){ put('#tr-pesos',m.pesos); put('#tr-det',m.det); put('#tr-rec', m.recargo ?? 0); put('#tr-base', m.pesos ? Math.round(m.pesos/(1+(m.recargo||0)/100)*100)/100 : ''); const modo = m.modo || (m.pct!==undefined && !m.cot ? 'pct' : 'cot');
-    $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot',m.cot); put('#tr-cot-cli',m.cotCli); put('#tr-pct',m.pct);
+    $('#tr-modo').value = modo; $('#tr-modo-pct').hidden = modo!=='pct'; $('#tr-modo-cot').hidden = modo==='pct'; put('#tr-cot', modo==='cot'?m.cot:''); put('#tr-pct-cot', modo==='pct'?m.cot:''); put('#tr-cot-cli',m.cotCli); put('#tr-pct',m.pct);
     compActual = m.comprobante ? {path:m.comprobante} : null; $('#dropPrev').innerHTML=''; $('#ocrStatus').textContent = m.comprobante ? 'Se conserva el comprobante ya guardado.' : ''; }
   if(o.tipo==='ganancia'){ put('#ga-monto',m.monto); $('#ga-mon').value = m.moneda||'ARS'; put('#ga-cot',m.cot); put('#ga-det',m.det); }
   if(o.tipo==='ajuste'){ put('#a-usd', o.haber ? o.haber : -o.debe); $('#a-mon').value = o.moneda||'USD'; put('#a-det',m.det); }
