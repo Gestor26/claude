@@ -42,22 +42,24 @@
   <button data-s="tienda">Store Generator</button>
   <button data-s="wsp">WhatsApp</button>
   <button data-s="gastos">Gastos</button>
+  <button data-s="credito">Crédito</button>
 </nav>
 <main>
   <iframe id="f-cuenta" src="cuenta.html?v=23" title="Cuenta Corriente"></iframe>
   <iframe id="f-tienda" data-src="tienda/index.html?v=9" title="Store Generator" hidden></iframe>
   <iframe id="f-gastos" data-src="gastos.html?v=6" title="Gastos" hidden></iframe>
+  <iframe id="f-credito" data-src="credito.html?v=1" title="Crédito con el proveedor" hidden></iframe>
   <iframe id="f-wsp" data-src="whatsapp/index.html?v=1" title="WhatsApp" hidden allow="clipboard-write"></iframe>
 </main>
 <script>
   const ir = location.hash.slice(1);
   function show(s){
     document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.s===s));
-    ['cuenta','tienda','wsp','gastos'].forEach(k=>{ const f=document.getElementById('f-'+k); f.hidden = k!==s; if(k===s && !f.src && f.dataset.src) f.src = f.dataset.src; });
+    ['cuenta','tienda','wsp','gastos','credito'].forEach(k=>{ const f=document.getElementById('f-'+k); f.hidden = k!==s; if(k===s && !f.src && f.dataset.src) f.src = f.dataset.src; });
     history.replaceState(null,'','#'+s);
   }
   document.querySelector('nav').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) show(b.dataset.s); });
-  if(['tienda','wsp','gastos'].includes(ir)) show(ir);
+  if(['tienda','wsp','gastos','credito'].includes(ir)) show(ir);
   window.addEventListener('message', e=>{ if(e.data && e.data.farroyo) show(e.data.farroyo); });
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
