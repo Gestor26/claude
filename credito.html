@@ -90,7 +90,7 @@
 
 <header class="topbar">
   <h1><span class="logo">F</span>Crédito con el proveedor</h1>
-  <div class="tools"><span class="who" id="who"></span><button id="btnRefresh">↻ Actualizar</button><button id="btnCSV">Exportar CSV</button><button id="btnLogout">Salir</button></div>
+  <div class="tools"><span class="who" id="who"></span><button id="btnRefresh">↻ Actualizar</button><button id="btnCSV">Exportar CSV</button><button id="btnReset" style="color:var(--red)">Restablecer</button><button id="btnLogout">Salir</button></div>
 </header>
 
 <div class="kpis">
@@ -222,6 +222,14 @@ $('#wrap').addEventListener('click', async e=>{
   const b=e.target.closest('.del'); if(!b) return; const o=movs.find(x=>x.id==b.dataset.id);
   if(!o||!confirm(`¿Eliminar ${NOMBRE[o.tipo]} · ${fmtUSD(Math.abs(o.monto))}${o.detalle?' · '+o.detalle:''}?`)) return;
   const {error}=await sb.from('credito_proveedor').delete().eq('id',o.id); if(error){ toast('No se pudo eliminar: '+error.message); return; } toast('Movimiento eliminado'); cargar();
+});
+$('#btnReset').addEventListener('click', async ()=>{
+  if(!movs.length){ toast('No hay movimientos para borrar.'); return; }
+  if(!confirm(`Esto borra los ${movs.length} movimientos del crédito con el proveedor (para todos los usuarios) y arranca de cero. ¿Continuar?`)) return;
+  if(!confirm('¿Seguro? No se puede deshacer. Si querés conservar un registro, exportá el CSV primero.')) return;
+  const {error}=await sb.from('credito_proveedor').delete().gte('id',0);
+  if(error){ toast('No se pudo borrar: '+error.message); return; }
+  toast('Crédito restablecido, arranca de cero.'); cargar();
 });
 $('#btnCSV').addEventListener('click', ()=>{
   const q=v=>`"${String(v).replace(/"/g,'""')}"`, f=n=>n.toFixed(2).replace('.',',');
