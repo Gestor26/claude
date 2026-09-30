@@ -60,6 +60,7 @@
   td.saldo{font-weight:500;border-left:1px solid var(--line);background:var(--surface-2)} td.saldo.neg{color:var(--red)}
   .det{color:var(--ink-2);font-size:.84rem;display:block;margin-top:3px}
   .tag{font-size:.76rem;padding:2px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);white-space:nowrap;font-weight:500;color:var(--ink-2)}
+  .tag[data-t=credito]{background:var(--green-soft);border-color:#C4DECB;color:var(--green)}
   .tag[data-t=envio]{background:var(--blue-soft);border-color:#C9D5EA;color:var(--blue)}
   .tag[data-t=rma]{background:var(--amber-soft);border-color:#EAD3A3;color:var(--amber)}
   .tag[data-t=compra]{background:var(--red-soft);border-color:#EACBC6;color:var(--red)}
@@ -94,7 +95,7 @@
 </header>
 
 <div class="kpis">
-  <div class="kpi disp" id="kDisp"><div class="k">Crédito disponible</div><div class="v num">USD 0,00</div><div class="s">Enviado + RMA − compras</div></div>
+  <div class="kpi disp" id="kDisp"><div class="k">Crédito disponible</div><div class="v num">USD 0,00</div><div class="s">Añadido + enviado + RMA − compras</div></div>
   <div class="kpi env" id="kEnv"><div class="k">Dinero enviado</div><div class="v num">USD 0,00</div><div class="s"></div></div>
   <div class="kpi rma" id="kRma"><div class="k">Crédito por RMA</div><div class="v num">USD 0,00</div><div class="s"></div></div>
   <div class="kpi" id="kComp"><div class="k">Compras (uso del crédito)</div><div class="v num">USD 0,00</div><div class="s"></div></div>
@@ -105,10 +106,11 @@
     <h2 id="asideTitle">Nuevo movimiento</h2>
     <div class="editando" id="editBanner" hidden><span>Editando un movimiento</span><button id="editCancel" type="button">Cancelar</button></div>
     <div class="tipos" id="tipos">
-      <button data-t="envio" class="on"><span class="ic">📤</span><span><b>Dinero enviado</b><small>Suma crédito</small></span></button>
+      <button data-t="credito" class="on"><span class="ic">➕</span><span><b>Añadir crédito</b><small>Suma crédito</small></span></button>
+      <button data-t="envio"><span class="ic">📤</span><span><b>Dinero enviado</b><small>Suma crédito</small></span></button>
       <button data-t="rma"><span class="ic">🔁</span><span><b>Crédito por RMA</b><small>Suma crédito</small></span></button>
       <button data-t="compra"><span class="ic">📦</span><span><b>Compra</b><small>Usa crédito</small></span></button>
-      <button data-t="ajuste"><span class="ic">🛠</span><span><b>Ajuste</b><small>Corrección +/−</small></span></button>
+      <button data-t="ajuste" style="grid-column:1/-1"><span class="ic">🛠</span><span><b>Ajuste</b><small>Corrección +/−</small></span></button>
     </div>
     <div class="row2">
       <div><label for="m-monto">Monto (USD)</label><input type="number" id="m-monto" inputmode="decimal" placeholder="5.000" step="any"></div>
@@ -123,7 +125,7 @@
 
   <section class="card">
     <div class="filters">
-      <select id="fTipo"><option value="">Todos los tipos</option><option value="envio">Dinero enviado</option><option value="rma">Crédito por RMA</option><option value="compra">Compras</option><option value="ajuste">Ajustes</option></select>
+      <select id="fTipo"><option value="">Todos los tipos</option><option value="credito">Crédito añadido</option><option value="envio">Dinero enviado</option><option value="rma">Crédito por RMA</option><option value="compra">Compras</option><option value="ajuste">Ajustes</option></select>
       <input type="month" id="fMes"><input type="search" id="fTxt" placeholder="Buscar en el detalle">
     </div>
     <div class="totals" id="totals"></div>
@@ -135,9 +137,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb = supabase.createClient('https://dyzwgtvilvayihouvwxt.supabase.co', 'sb_publishable_-ULhiIpFLn6UePSU8GKzXg_Ubm4EZkd');
-const NOMBRE = {envio:'Dinero enviado', rma:'Crédito por RMA', compra:'Compra', ajuste:'Ajuste'};
-const PH = {envio:'Referencia de la transferencia / USDT', rma:'N° de RMA, equipo devuelto', compra:'Equipos comprados, pedido n°', ajuste:'Motivo (negativo resta crédito)'};
-let user=null, tipo='envio', editando=null, movs=[];
+const NOMBRE = {credito:'Crédito añadido', envio:'Dinero enviado', rma:'Crédito por RMA', compra:'Compra', ajuste:'Ajuste'};
+const PH = {credito:'Motivo del crédito (opcional)', envio:'Referencia de la transferencia / USDT', rma:'N° de RMA, equipo devuelto', compra:'Equipos comprados, pedido n°', ajuste:'Motivo (negativo resta crédito)'};
+let user=null, tipo='credito', editando=null, movs=[];
 const $ = s => document.querySelector(s);
 const today = () => new Date().toISOString().slice(0,10);
 const fmtUSD = n => 'USD ' + n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
