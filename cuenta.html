@@ -419,6 +419,7 @@
         <option value="entrega">Entrega de USD</option>
         <option value="usdt">Envío USDT</option>
         <option value="transf">Transferencia</option>
+        <option value="dup">⚠ Transferencias duplicadas</option>
         <option value="ganancia">Ganancia extra (por afuera)</option>
         <option value="ajuste">Ajuste</option>
       </select>
@@ -807,7 +808,7 @@ function render(){
   $('#saldoSub').textContent = all.length ? `${usd>0.005?'Tenés a favor':usd<-0.005?'Le debés':'A cero'} · ${all.length} ${all.length===1?'movimiento':'movimientos'}` : 'Todavía no cargaste operaciones.';
 
   const ft=$('#fTipo').value, fm=$('#fMes').value, fx=$('#fTxt').value.trim().toLowerCase();
-  const vis = all.filter(o => (!ft||o.tipo===ft) && (!fm||o.fecha.startsWith(fm)) && (!fx||o.detalle.toLowerCase().includes(fx)));
+  const vis = all.filter(o => (ft==='dup' ? dups.has(o.id) : (!ft||o.tipo===ft)) && (!fm||o.fecha.startsWith(fm)) && (!fx||o.detalle.toLowerCase().includes(fx)));
   const sum = (mon,k) => vis.filter(o=>o.moneda===mon && !o.meta?.pendiente).reduce((s,o)=>s+o[k],0);
   const partes = [];
   if(vis.some(o=>o.moneda==='USD')) partes.push(`<span>USD: acreditado <b class="num">${fmtUSD(sum('USD','haber'))}</b> · debitado <b class="num">${fmtUSD(sum('USD','debe'))}</b></span>`);
@@ -820,7 +821,7 @@ function render(){
   const gEl = $('#gananciaTxt'); gEl.hidden = !gTot; if(gTot){ gEl.querySelector('.v').textContent = fmtARS(gMes); gEl.querySelector('.s').textContent = (gExMes?`${fmtARS(gMes-gExMes)} recargos + ${fmtARS(gExMes)} extras · `:'') + `${fmtARS(gTot)} histórico`; }
 
   if(!vis.length){
-    $('#ledgerWrap').innerHTML = `<div class="empty">${all.length?'Ningún movimiento coincide con el filtro.':'Cargá la primera operación desde el panel de la izquierda.'}</div>`;
+    $('#ledgerWrap').innerHTML = `<div class="empty">${ft==='dup'?'No hay transferencias duplicadas. 👌':all.length?'Ningún movimiento coincide con el filtro.':'Cargá la primera operación desde el panel de la izquierda.'}</div>`;
     return;
   }
   const rows = [...vis].reverse().map(o => `
@@ -863,7 +864,7 @@ const ORIGEN = {tarjeta:'Recargo tarjeta', transf:'Recargo transferencia', compr
 function renderGanancias(all){
   const ft=$('#fTipo').value, fm=$('#fMes').value, fx=$('#fTxt').value.trim().toLowerCase();
   const vistos = new Set(); const con = all.filter(o => { if(!(o.meta?.ganARS||o.meta?.ganUSD)) return false; const g=o.meta?.grupo; if(g){ if(vistos.has(g)) return false; vistos.add(g); } return true; });
-  const vis = con.filter(o => (!ft||o.tipo===ft) && (!fm||o.fecha.startsWith(fm)) && (!fx||o.detalle.toLowerCase().includes(fx)));
+  const vis = con.filter(o => (!ft||o.tipo===(ft==='dup'?'transf':ft)) && (!fm||o.fecha.startsWith(fm)) && (!fx||o.detalle.toLowerCase().includes(fx)));
   const sA = arr => arr.reduce((s,o)=>s+(o.meta?.ganARS||0),0), sU = arr => arr.reduce((s,o)=>s+(o.meta?.ganUSD||0),0);
   const mesAct = today().slice(0,7);
   const cards = [
