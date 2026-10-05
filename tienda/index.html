@@ -1316,9 +1316,9 @@ function parsearWatch(rows){
     var mm=mm_m?parseInt(mm_m[1]):0;
     // Conectividad: se lee de la fila (nombre, color, tipo, etc.). Si no dice Cellular/LTE, es solo GPS.
     var fila=r.join(' ').toLowerCase();
-    var cell=/cellular|celular|\blte\b|4g|5g/.test(fila);
+    var cell=/cellular|celular|\bcell\b|\blte\b/.test(fila);
     var conect=cell?'GPS + Cellular':'GPS';
-    nL=nL.replace(/\s*\(?\s*gps\s*(\+\s*)?(cellular|celular|lte)?\s*\)?/i,' ').replace(/\s{2,}/g,' ').trim();
+    nL=nL.replace(/\s*\+?\s*\(?\s*gps\s*(\+\s*)?(cellular|celular|cell|lte)?\s*\)?/i,' ').replace(/\s{2,}/g,' ').trim();
     var key=nL+'|'+mm+'|'+conect+'|'+(esSellado?'S':'OB');
     if(!grupos[key]||usd<grupos[key].usd){
       grupos[key]={n:nL,mm:mm,usd:usd,_ord:ordW(nL),_mm:mm,sellado:esSellado,conect:conect};
