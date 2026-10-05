@@ -1314,18 +1314,23 @@ function parsearWatch(rows){
     var nL=limpW(n).replace(/\s*sellado\s*/i,' ').trim();
     var mm_m=n.match(/(\d+)\s*[Mm][Mm]/)||n.match(/(\d+)mm/i);
     var mm=mm_m?parseInt(mm_m[1]):0;
-    var key=nL+'|'+mm+'|'+(esSellado?'S':'OB');
+    // Conectividad: se lee de la fila (nombre, color, tipo, etc.). Si no dice Cellular/LTE, es solo GPS.
+    var fila=r.join(' ').toLowerCase();
+    var cell=/cellular|celular|\blte\b|4g|5g/.test(fila);
+    var conect=cell?'GPS + Cellular':'GPS';
+    nL=nL.replace(/\s*\(?\s*gps\s*(\+\s*)?(cellular|celular|lte)?\s*\)?/i,' ').replace(/\s{2,}/g,' ').trim();
+    var key=nL+'|'+mm+'|'+conect+'|'+(esSellado?'S':'OB');
     if(!grupos[key]||usd<grupos[key].usd){
-      grupos[key]={n:nL,mm:mm,usd:usd,_ord:ordW(nL),_mm:mm,sellado:esSellado};
+      grupos[key]={n:nL,mm:mm,usd:usd,_ord:ordW(nL),_mm:mm,sellado:esSellado,conect:conect};
     }
   });
   var out=[];
   Object.keys(grupos).forEach(function(k){
     var g=grupos[k];
-    var sub=g.mm?g.mm+'mm \u00b7 GPS + Cellular':'GPS + Cellular';
-    out.push({n:g.n,sub:sub,usd:g.usd,sellado:g.sellado,_ord:g._ord,_mm:g._mm});
+    var sub=g.mm?g.mm+'mm \u00b7 '+g.conect:g.conect;
+    out.push({n:g.n,sub:sub,usd:g.usd,sellado:g.sellado,_ord:g._ord,_mm:g._mm,_cell:g.conect==='GPS'?0:1});
   });
-  return out.sort(function(a,b){return(b._ord-a._ord)||(b._mm-a._mm)||((b.sellado?1:0)-(a.sellado?1:0));});
+  return out.sort(function(a,b){return(b._ord-a._ord)||(b._mm-a._mm)||(b._cell-a._cell)||((b.sellado?1:0)-(a.sellado?1:0));});
 }
 function parsearIPad(rows){
   var out=[];
