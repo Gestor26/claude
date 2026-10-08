@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Farroyo | Financiación con DNI</title>
+<meta name="description" content="Planes de financiación con DNI en 3, 6 y 12 cuotas para iPhone, MacBook, iPad, AirPods y Apple Watch.">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#0B2A5B; --azul:#1565D8; --celeste:#EEF5FD;
+  --tinta:#14213A; --gris:#64718A; --gris-2:#94A0B4; --linea:#E3E8F0; --fondo:#F6F8FB;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 130px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--fondo);color:var(--tinta);
+  font-family:Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--azul);outline-offset:2px}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+
+/* Encabezado */
+.top{background:#fff;border-bottom:1px solid var(--linea)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+.logo{font-weight:800;font-size:20px;letter-spacing:2px;color:var(--navy)}
+.top-tag{font-size:13px;font-weight:600;color:var(--gris)}
+
+.intro{padding:36px 0 28px}
+.intro h1{margin:0;font-size:28px;line-height:1.15;font-weight:700;color:var(--navy);letter-spacing:-.3px}
+.intro p{margin:10px 0 0;max-width:56ch;color:var(--gris)}
+.facts{display:flex;flex-wrap:wrap;gap:24px;margin-top:22px;padding-top:18px;border-top:1px solid var(--linea)}
+.fact dt{font-size:12px;color:var(--gris)}
+.fact dd{margin:2px 0 0;font-weight:700;font-size:15px;color:var(--tinta)}
+
+/* Navegación fija */
+.nav{position:sticky;top:0;z-index:5;background:rgba(246,248,251,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--linea);padding-top:env(safe-area-inset-top,0px)}
+.tabs{display:flex;gap:28px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;border:0;background:none;padding:14px 0 12px;font-weight:600;font-size:15px;color:var(--gris);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--navy);border-bottom-color:var(--navy)}
+.tools{display:flex;gap:12px;align-items:center;padding:12px 0;flex-wrap:wrap}
+.seg{display:inline-flex;background:#fff;border:1px solid var(--linea);border-radius:8px;padding:3px}
+.seg button{border:0;background:none;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;color:var(--gris)}
+.seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.search{flex:1 1 200px;min-width:0;height:36px;border:1px solid var(--linea);border-radius:8px;padding:0 12px;background:#fff;font-size:14px}
+
+/* Secciones y tabla */
+main{padding:8px 0 48px}
+.section{margin-top:28px}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.section-head h2{margin:0;font-size:17px;font-weight:700;color:var(--navy)}
+.section-head span{font-size:13px;color:var(--gris)}
+
+.table{display:flex;flex-direction:column;gap:12px}
+.thead{display:none}
+.group{background:#fff;border:1px solid var(--linea);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(11,42,91,.04)}
+.model{padding:10px 12px 10px 18px;font-weight:700;font-size:16px;color:var(--navy);background:var(--celeste);border-bottom:1px solid var(--linea);border-left:4px solid var(--navy)}
+.var{padding-top:14px !important}
+.var{padding:10px 18px 16px}
+.var + .var{border-top:1px dashed var(--linea)}
+.var-info{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.meta{font-size:13px;color:var(--gris)}
+.meta:empty{display:none}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--linea);border-radius:8px}
+.plan{padding:10px 10px 9px;text-align:center}
+.plan + .plan{border-left:1px solid var(--linea)}
+.plan .n{font-size:11px;color:var(--gris);font-weight:600}
+.plan .u{font-size:17px;font-weight:700;color:var(--navy);margin-top:2px;white-space:nowrap}
+.plan .u small{font-size:11px;font-weight:600;color:var(--gris);margin-right:3px}
+.plan .a{font-size:11px;color:var(--gris);line-height:1.35}
+@media (min-width:720px){.plan .a{font-size:11.5px;white-space:nowrap}}
+.model{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.wsp-btn{flex:0 0 auto;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;background:#25D366;color:#fff;text-decoration:none;
+  font-size:13px;font-weight:700;padding:7px 12px;border-radius:8px}
+.wsp-btn:hover{background:#1EBE5A}
+.consult{display:inline-block;margin-top:10px;font-size:13px;font-weight:600;color:var(--azul);text-decoration:none}
+.consult:hover{text-decoration:underline}
+
+@media (min-width:720px){
+  .intro h1{font-size:34px}
+  .var{display:grid;grid-template-columns:1fr 450px;align-items:center;padding:10px 18px 12px 22px}
+  .var + .var{border-top:1px dashed var(--linea)}
+  .meta{margin:0}
+  .meta:empty{display:block}
+  .plans{grid-template-columns:repeat(3,150px);border:0}
+  .plan{text-align:right;padding:4px 0}
+  .plan + .plan{border-left:0}
+  .plan .n{font-size:11.5px}
+  .var-info{margin:0;justify-content:space-between;gap:16px;padding-right:28px}
+  .consult{margin:0}
+}
+
+/* Filtro por cuota */
+.budget{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:20px;padding:14px 16px;background:#fff;border:1px solid var(--linea);border-radius:10px;font-size:13px;color:var(--gris)}
+.budget:empty{display:none}
+.budget label{font-weight:700;color:var(--navy);font-size:14px;flex-basis:100%}
+@media (min-width:720px){.budget label{flex-basis:auto;margin-right:4px}}
+.money{display:flex;align-items:center;background:#fff;border:1px solid var(--linea);border-radius:8px;height:36px;padding:0 10px;min-width:150px;flex:0 1 190px}
+.money span{font-weight:700;color:var(--gris);margin-right:6px}
+.money input{border:0;outline:0;width:100%;font-size:14px;background:transparent}
+.budget .clear{border:0;background:none;color:var(--azul);font-weight:600;font-size:13px;padding:4px}
+.budget .hint{flex-basis:100%;font-size:12.5px}
+.plan.off{opacity:.3}
+.plan.off .u{text-decoration:line-through;text-decoration-thickness:1px}
+
+/* Estados */
+.empty{text-align:center;padding:48px 16px;color:var(--gris)}
+.drop{border:1px dashed var(--gris-2);border-radius:10px;padding:28px 18px;text-align:center;margin:24px 0;background:#fff}
+.drop p{margin:0 0 12px;color:var(--gris);font-size:14px}
+.btn{border:0;border-radius:8px;background:var(--navy);color:#fff;font-weight:600;padding:10px 16px;margin:4px;font-size:14px}
+.btn.ghost{background:var(--celeste);color:var(--navy)}
+
+footer{border-top:1px solid var(--linea);background:#fff}
+footer .wrap{padding:24px 20px 36px;font-size:12.5px;color:var(--gris);line-height:1.7}
+footer h3{margin:0 0 6px;font-size:13px;color:var(--tinta)}
+footer p{margin:0 0 4px;max-width:70ch}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="logo">FARROYO</div>
+    <div class="top-tag">Financiación con DNI</div>
+  </div>
+</header>
+
+<section class="intro">
+  <div class="wrap">
+    <h1>Planes de financiación con DNI</h1>
+    <p>Valores por cuota en dólares, con su equivalente estimado en pesos. Elegí el equipo y el plan que mejor te quede.</p>
+    <dl class="facts">
+      <div class="fact"><dt>Planes</dt><dd>3, 6 y 12 cuotas</dd></div>
+      <div class="fact"><dt>Requisito</dt><dd>DNI, sujeto a aprobación</dd></div>
+      <div class="fact"><dt>Dólar de referencia</dt><dd id="dolar">Cargando…</dd></div>
+      <div class="fact"><dt>Stock actualizado</dt><dd id="actualizado">Cargando…</dd></div>
+    </dl>
+  </div>
+</section>
+
+<div class="nav" id="bar" hidden>
+  <div class="wrap">
+    <div class="tabs" id="cats" role="tablist" aria-label="Categorías"></div>
+    <div class="tools" id="filters"></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="budget" id="budget"></div>
+  <div id="list"></div>
+  <div id="state"></div>
+</main>
+
+<footer>
+  <div class="wrap" id="foot"></div>
+</footer>
+
+<script>
+const CONFIG = {
+  // Pegá acá la URL de la aplicación web de Google Apps Script (termina en /exec).
+  // Si queda vacío, la página lee stock.xlsx de la misma carpeta.
+  API_URL: 'https://script.google.com/macros/s/AKfycbx4GT_AVI-xSRIeH6J1kE8Xkh-GlWKFW5ezCuZVDJhohtVFFW9XjQW8GH9iQWiYAO-zSg/exec',
+  ARCHIVO_EXCEL: 'stock.xlsx',
+  WHATSAPP: '5493413105554',             // sin +, sin espacios
+  NOMBRE: 'Farroyo',
+  // Financiación con DNI: multiplicador sobre el precio contado (no se muestra al cliente)
+  PLANES: [ {n:3, f:1.45}, {n:6, f:1.84}, {n:12, f:2.56} ],
+  DOLAR_FIJO: null,                      // forzar una cotización (ej: 1600). null = automático
+  DOLAR_RESPALDO: 1566,                  // solo si falla todo lo demás
+  REDONDEO_PESOS: 100,                   // redondea los pesos hacia arriba a múltiplos de esto
+  ORDEN_CATEGORIAS: ['iPhone','MacBook','iPad','AirPods','Apple Watch','Otros']
+};
+
+/* ============================================================
+   Utilidades de la página
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const fmtUSD = n => 'USD ' + Math.ceil(n).toLocaleString('es-AR');
+const fmtARS = n => '$ ' + (Math.ceil(n / CONFIG.REDONDEO_PESOS) * CONFIG.REDONDEO_PESOS).toLocaleString('es-AR');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hhmm = d => new Date(d).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit', hourCycle:'h23'});
+async function withTimeout(p, ms){ return Promise.race([p, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')), ms))]); }
+
+/* ============================================================
+   NÚCLEO COMPARTIDO (idéntico en la página y en Google Apps Script)
+   ============================================================ */
+const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+
+function parseNum(v){
+  if (typeof v === 'number') return v;
+  let s = String(v == null ? '' : v).replace(/[^\d.,-]/g,'');
+  if (!s) return NaN;
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g,'').replace(',','.');      // 1.250,50
+  else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g,'');                   // 1,250.50
+  else s = s.replace(',','.');
+  return parseFloat(s);
+}
+
+// Dólar blue Rosario, precio de venta, desde el HTML de InfoDolar
+function parseInfoDolar(html){
+  const i = html.search(/Blue[\s\S]{0,300}?en Rosario/i);
+  if (i < 0) return null;
+  let seg = html.slice(i, i + 6000);
+  const c = seg.search(/colCompraVenta/i); if (c < 0) return null;   // salta el encabezado de la tabla
+  seg = seg.slice(c);
+  const end = seg.search(/<\/tr>/i); if (end > 0) seg = seg.slice(0, end);
+  const rx = /\$\s*([\d.]+,\d{2})/g, vals = [];
+  let m; while ((m = rx.exec(seg))) { const n = parseNum(m[1]); if (n > 100) vals.push(n); }
+  return vals.length ? Math.max.apply(null, vals) : null;   // venta = el mayor de compra/venta
+}
+
+/* Lectura de la planilla
+   Formato de las planillas de Farroyo: una fila por unidad (IMEI).
+   Las columnas se reconocen por su contenido, no por el título.
+   Solo se publican unidades "Disponible" con precio; se excluyen
+   reservados, señados, en reparación y las secciones Outlet / Revisión.
+   ============================================================ */
+const EXCLUIR = /reparac|reserv|senad|no ofrecer|revision/;
+const SECCION_EXCLUIDA = /outle|revision|reparac|reserv/;
+
+function detectCategory(text){
+  const t = norm(text);
+  if (/iphone|^ip\b|\bip\s/.test(t)) return 'iPhone';
+  if (/macbook|\bmac\b|imac/.test(t)) return 'MacBook';
+  if (/ipad/.test(t)) return 'iPad';
+  if (/airpod/.test(t)) return 'AirPods';
+  if (/watch/.test(t)) return 'Apple Watch';
+  return null;
+}
+function detectCondition(text){
+  const t = norm(text);
+  if (/open/.test(t)) return 'Open box';
+  if (/usad|used|semi|reacond/.test(t)) return 'Usado';
+  if (/sellad|nuevo|new|sealed/.test(t)) return 'Sellado';
+  return null;
+}
+
+function detectColumns(header, data){
+  const ncol = Math.max(header.length, ...data.slice(0, 50).map(r => r.length));
+  const frac = (i, rx) => {
+    const v = data.map(r => String(r[i] == null ? '' : r[i]).trim()).filter(Boolean).slice(0, 300);
+    return v.length ? v.filter(x => rx.test(norm(x))).length / v.length : 0;
+  };
+  const m = { obs: [] };
+  for (let i = 0; i < ncol; i++){
+    const h = norm(header[i]);
+    if (m.modelo === undefined && /^(modelo|equipo|producto)/.test(h)) m.modelo = i;
+    if (m.color === undefined && /^color/.test(h)) m.color = i;
+    if (m.bateria === undefined && /bater|salud/.test(h)) m.bateria = i;
+    if (/obs|reserva|nota/.test(h)) m.obs.push(i);
+  }
+  for (let i = 0; i < ncol; i++){
+    if ([m.modelo, m.color, m.bateria].includes(i) || m.obs.includes(i)) continue;
+    if (m.precio === undefined && frac(i, /^(u\$s|usd|\$)\s?[\d.,]+$/) > .6) m.precio = i;
+    else if (m.gb === undefined && frac(i, /^\d+\s?(gb|tb)\b/) > .6) m.gb = i;
+    else if (m.estado === undefined && frac(i, /^(disponible|reparacion|reservado|vendido|senado)/) > .6) m.estado = i;
+    else if (m.cond === undefined && frac(i, /(sellad|open box|usad)/) > .6) m.cond = i;
+  }
+  if (m.modelo === undefined) m.modelo = 0;
+  return m;
+}
+
+function cleanModel(s, cat){
+  let t = String(s).replace(/\s+/g, ' ').trim()
+    .replace(/^apple (?=ipad|airpods|iphone|macbook)/i, '')
+    .replace(/^iphone/i, 'iPhone').replace(/^ipad/i, 'iPad').replace(/^macbook/i, 'MacBook').replace(/^airpods/i, 'AirPods');
+  if (cat === 'iPhone' && !/^iphone/i.test(t)) t = 'iPhone ' + t;
+  return t;
+}
+function cleanGB(s){
+  const parts = String(s).split('/').map(p => p.trim()).filter(Boolean)
+    .map(p => p.replace(/(\d)\s*(gb|tb)\b/i, (_, d, u) => d + ' ' + u.toUpperCase()).replace(/(\d+(?:,\d)?)\s*pulgadas/i, '$1"'));
+  if (parts.length >= 2 && /GB/.test(parts[1])) parts[1] += ' RAM';
+  return parts.join(' | ').replace(/^1024 GB$/, '1 TB');
+}
+const titleCase = s => String(s).trim().toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+
+// sheets: [{name, rows}] — rows como texto, tal cual se ve en la planilla
+function parseSheets(sheets){
+  const units = [];
+  sheets.forEach(({name: sheetName, rows}) => {
+    const sheetCat = detectCategory(sheetName);
+    if (!sheetCat) return;                       // solo pestañas de productos
+    const sheetCond = detectCondition(sheetName);
+    if (rows.length < 2) return;
+    const m = detectColumns(rows[0], rows.slice(1));
+    if (m.precio === undefined) return;
+    let excluida = false;
+    rows.slice(1).forEach(r => {
+      const cell = i => i === undefined ? '' : String(r[i] == null ? '' : r[i]).trim();
+      const filled = r.filter(c => String(c).trim() && !/^(true|false)$/i.test(String(c).trim()));
+      const modeloRaw = cell(m.modelo);
+      // fila título de sección (ej. "Outleet", "Equipos en Revision")
+      if (filled.length === 1 && modeloRaw){ excluida = SECCION_EXCLUIDA.test(norm(modeloRaw)); return; }
+      if (excluida || !modeloRaw) return;
+      const precio = parseNum(cell(m.precio));
+      if (!(precio > 0)) return;
+      const estado = cell(m.estado), obs = m.obs.map(cell).filter(Boolean).join(' ');
+      // En reparación solo por batería (sin otras fallas ni observaciones) se publica como disponible
+      const tipo = norm(cell(m.cond));
+      const reparBateria = /reparac/.test(norm(estado)) && /bateria/.test(tipo) && !/pantalla|camara/.test(tipo) && !obs;
+      if (m.estado !== undefined && !/disponible/i.test(estado) && !reparBateria) return;
+      if (EXCLUIR.test(norm(modeloRaw + ' ' + (reparBateria ? '' : estado) + ' ' + obs))) return;
+
+      const cat = detectCategory(modeloRaw) || sheetCat;
+      let bat = parseNum(cell(m.bateria)); bat = bat > 0 && bat <= 100 ? Math.round(bat) : null;
+      units.push({
+        cat,
+        cond: detectCondition(cell(m.cond)) || sheetCond || (bat ? 'Usado' : 'Sellado'),
+        modelo: cleanModel(modeloRaw, cat),
+        gb: cleanGB(cell(m.gb)),
+        color: cell(m.color) ? titleCase(cell(m.color)) : '',
+        bat, precio,
+        nota: /pantalla desconocida/i.test(obs) ? 'Pantalla no original' : ''
+      });
+    });
+  });
+
+  // Agrupa unidades iguales (mismo modelo, capacidad, condición, precio y nota)
+  const map = new Map();
+  units.forEach(u => {
+    const k = [u.cat, u.cond, norm(u.modelo), u.gb, u.precio, u.nota].join('|');
+    let g = map.get(k);
+    if (!g) map.set(k, g = {cat:u.cat, cond:u.cond, modelo:u.modelo, gb:u.gb, precio:u.precio, nota:u.nota, colores:[], bats:[], n:0});
+    g.n++;
+    if (u.color && !g.colores.some(c => norm(c) === norm(u.color))) g.colores.push(u.color);
+    if (u.bat) g.bats.push(u.bat);
+  });
+  return [...map.values()].map(g => ({
+    ...g,
+    color: g.colores.join(', '),
+    bat: g.bats.length ? (Math.min(...g.bats) === Math.max(...g.bats) ? `${g.bats[0]}%` : `${Math.min(...g.bats)}% a ${Math.max(...g.bats)}%`) : ''
+  }));
+}
+
+
+function parseWorkbook(wb){
+  return parseSheets(wb.SheetNames.map(name => ({
+    name, rows: XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:'', raw:false})
+  })));
+}
+
+/* ============================================================
+   Dólar sin Apps Script (respaldo)
+   ============================================================ */
+const INFODOLAR = 'https://www.infodolar.com/cotizacion-dolar-localidad-rosario-provincia-santa-fe.aspx';
+const PROXIES = [
+  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u)
+];
+async function getDolar(){
+  if (CONFIG.DOLAR_FIJO) return {valor: CONFIG.DOLAR_FIJO, fuente: 'fijo'};
+  try{
+    const c = JSON.parse(localStorage.getItem('farroyo_dolar') || 'null');
+    if (c && Date.now() - c.t < 20*60*1000) return c.d;
+  }catch(e){}
+  let d = null;
+  for (const p of PROXIES){
+    try{
+      const r = await withTimeout(fetch(p(INFODOLAR)), 7000);
+      if (!r.ok) continue;
+      const v = parseInfoDolar(await r.text());
+      if (v){ d = {valor: v, fuente: 'rosario'}; break; }
+    }catch(e){}
+  }
+  if (!d){
+    try{
+      const r = await withTimeout(fetch('https://dolarapi.com/v1/dolares/blue'), 6000);
+      const j = await r.json();
+      if (j && j.venta) d = {valor: j.venta, fuente: 'blue'};
+    }catch(e){}
+  }
+  if (!d) d = {valor: CONFIG.DOLAR_RESPALDO, fuente: 'respaldo'};
+  d.hora = hhmm(Date.now());
+  if (d.fuente !== 'respaldo') try{ localStorage.setItem('farroyo_dolar', JSON.stringify({t:Date.now(), d})); }catch(e){}
+  return d;
+}
+
+/* ============================================================
+   Estadísticas (visitas y clics en Contactanos)
+   ============================================================ */
+function track(evento, detalle){
+  if (!CONFIG.API_URL) return;
+  try{
+    fetch(`${CONFIG.API_URL}?evento=${evento}&detalle=${encodeURIComponent(detalle || '')}`, {mode:'no-cors', keepalive:true});
+  }catch(e){}
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+const S = { items: [], dolar: null, actualizado: null, cat: null, cond: 'Todos', q: '', tope: '', moneda: 'USD' };
+const COND_ORDEN = ['Sellado','Open box','Usado'];
+const COND_TITULO = {'Sellado':'Nuevos sellados','Open box':'Open box','Usado':'Usados seleccionados'};
+
+function cuotas(precio){
+  return CONFIG.PLANES.map(p => {
+    const usd = precio * p.f / p.n;
+    return { n: p.n, usd, ars: usd * S.dolar.valor };
+  });
+}
+
+const hayTope = () => parseNum(S.tope) > 0;
+function enTope(c){
+  const v = parseNum(S.tope);
+  if (!(v > 0)) return true;
+  return S.moneda === 'USD' ? Math.ceil(c.usd) <= v
+    : Math.ceil(c.ars / CONFIG.REDONDEO_PESOS) * CONFIG.REDONDEO_PESOS <= v;
+}
+const topeTxt = () => S.moneda === 'USD' ? 'USD ' + S.tope : '$ ' + S.tope;
+
+function renderActualizado(){
+  const el = $('#actualizado');
+  if (!S.actualizado){ el.parentElement.hidden = true; return; }
+  const d = new Date(S.actualizado), hoy = new Date();
+  const dia = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()) - dia) / 864e5);
+  const fecha = diff === 0 ? 'Hoy' : diff === 1 ? 'Ayer' : d.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit'});
+  el.textContent = `${fecha}, ${hhmm(d)} hs`;
+}
+
+function renderBudget(){
+  const sym = S.moneda === 'USD' ? 'USD' : '$';
+  $('#budget').innerHTML = `
+    <label for="tope">¿Cuánto querés pagar por mes?</label>
+    <div class="money"><span>${sym}</span><input id="tope" inputmode="numeric" placeholder="${S.moneda === 'USD' ? 'Ej: 200' : 'Ej: 300.000'}" value="${esc(S.tope)}" aria-label="Cuota máxima en ${S.moneda === 'USD' ? 'dólares' : 'pesos'}"></div>
+    <div class="seg" role="group" aria-label="Moneda">
+      <button aria-pressed="${S.moneda==='USD'}" data-moneda="USD">Dólares</button>
+      <button aria-pressed="${S.moneda==='ARS'}" data-moneda="ARS">Pesos</button>
+    </div>
+    ${S.tope ? '<button class="clear" data-clear>Borrar</button>' : ''}
+    <div class="hint" id="hint"></div>`;
+  const inp = $('#tope');
+  inp.addEventListener('input', e => {
+    const raw = e.target.value.replace(/[^\d]/g, '');
+    S.tope = raw ? (+raw).toLocaleString('es-AR') : '';
+    e.target.value = S.tope;
+    const had = !!$('[data-clear]');
+    if (had !== !!S.tope){ renderBudget(); $('#tope').focus(); const v = $('#tope'); v.setSelectionRange(v.value.length, v.value.length); }
+    renderList();
+  });
+}
+
+function renderDolar(){
+  const d = S.dolar;
+  const etiqueta = {rosario:'blue Rosario', blue:'blue', fijo:'', respaldo:''}[d.fuente];
+  $('#dolar').textContent = `$ ${Math.round(d.valor).toLocaleString('es-AR')}${etiqueta ? ' (' + etiqueta + ')' : ''}`;
+}
+
+function renderCats(){
+  const counts = {};
+  S.items.forEach(it => counts[it.cat] = (counts[it.cat] || 0) + 1);
+  const cats = CONFIG.ORDEN_CATEGORIAS.filter(c => counts[c]).concat(Object.keys(counts).filter(c => !CONFIG.ORDEN_CATEGORIAS.includes(c)));
+  if (!S.cat || !counts[S.cat]) S.cat = cats[0];
+  $('#cats').innerHTML = cats.map(c =>
+    `<button class="tab" role="tab" aria-selected="${c===S.cat}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+}
+
+function renderFilters(){
+  const inCat = S.items.filter(it => it.cat === S.cat);
+  const conds = COND_ORDEN.filter(c => inCat.some(it => it.cond === c));
+  if (!conds.includes(S.cond)) S.cond = 'Todos';
+  const seg = conds.length > 1
+    ? `<div class="seg" role="group" aria-label="Condición">${['Todos', ...conds].map(c =>
+        `<button aria-pressed="${c===S.cond}" data-cond="${esc(c)}">${c === 'Todos' ? 'Todos' : c === 'Open box' ? 'Open box' : c + 's'}</button>`).join('')}</div>` : '';
+  $('#filters').innerHTML = seg + `<input class="search" id="q" type="search" placeholder="Buscar por modelo, capacidad o color" value="${esc(S.q)}" aria-label="Buscar">`;
+  $('#q').addEventListener('input', e => { S.q = e.target.value; renderList(); });
+}
+
+function varHTML(it){
+  const meta = [it.gb, it.color, it.bat ? `Batería ${it.bat}` : '', it.nota].filter(Boolean).map(esc).join('  |  ');
+  return `<div class="var">
+    <div class="var-info"><div class="meta">${meta}</div>${wspBtn(it)}</div>
+    <div class="plans">${cuotas(it.precio).map(c => `<div class="plan${enTope(c) ? '' : ' off'}">
+      <div class="n">${c.n} cuotas</div>
+      <div class="u"><small>USD</small>${Math.ceil(c.usd).toLocaleString('es-AR')}</div>
+      <div class="a">Aprox ${fmtARS(c.ars).replace('$ ','$')} pesos</div></div>`).join('')}</div>
+  </div>`;
+}
+
+const WSP_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1 2.7.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
+function wspBtn(it){
+  if (!CONFIG.WHATSAPP) return '';
+  const cond = {'Sellado':'Nuevo sellado','Open box':'Open box','Usado':'Usado'}[it.cond] || it.cond;
+  const lineas = [
+    `Equipo: ${it.modelo}`,
+    it.gb ? `Capacidad: ${it.gb}` : '',
+    `Condición: ${cond}`,
+    it.bat ? `Batería: ${it.bat}` : '',
+    it.color ? `Colores: ${it.color}` : '',
+    'Forma de pago: financiación con DNI'
+  ].filter(Boolean);
+  const txt = `Hola, me interesa este modelo:\n\n${lineas.join('\n')}`;
+  return `<a class="wsp-btn" data-track="${esc([it.modelo, it.gb, '(' + it.cond + ')'].filter(Boolean).join(' '))}" target="_blank" rel="noopener" href="https://wa.me/${CONFIG.WHATSAPP}?text=${encodeURIComponent(txt)}" aria-label="Contactanos por ${esc(it.modelo)} ${esc(it.gb)} por WhatsApp">${WSP_ICON}<span>Contactanos</span></a>`;
+}
+
+function renderList(){
+  const q = norm(S.q), tope = hayTope();
+  const list = S.items.filter(it => it.cat === S.cat
+    && (S.cond === 'Todos' || it.cond === S.cond)
+    && (!q || norm([it.modelo, it.gb, it.color, it.cond, it.bat].join(' ')).includes(q))
+    && (!tope || cuotas(it.precio).some(enTope)));
+
+  const thead = `<div class="thead"><span>Equipo</span>${CONFIG.PLANES.map(p => `<span>${p.n} cuotas</span>`).join('')}</div>`;
+  const html = COND_ORDEN.map(cond => {
+    const items = list.filter(it => it.cond === cond);
+    const unidades = items.reduce((a, it) => a + (it.n || 1), 0);
+    if (!items.length) return '';
+    const groups = [];
+    items.forEach(it => {
+      let g = groups.find(g => norm(g.modelo) === norm(it.modelo));
+      if (!g) groups.push(g = {modelo: it.modelo, vars: []});
+      g.vars.push(it);
+    });
+    return `<section class="section">
+      <div class="section-head"><h2>${COND_TITULO[cond]}</h2><span>${unidades} ${unidades === 1 ? 'equipo disponible' : 'equipos disponibles'}</span></div>
+      <div class="table">${thead}${groups.map(g =>
+        `<div class="group"><div class="model"><span>${esc(g.modelo)}</span></div>${g.vars.map(varHTML).join('')}</div>`).join('')}</div>
+    </section>`;
+  }).join('');
+
+  $('#list').innerHTML = html;
+  const hint = $('#hint');
+  if (hint) hint.textContent = !tope ? '' : list.length
+    ? `${list.length === 1 ? 'Hay 1 opción' : 'Hay ' + list.length + ' opciones'} en ${S.cat} con al menos un plan de hasta ${topeTxt()} por mes. Los planes que superan ese monto se ven atenuados.`
+    : '';
+  $('#state').innerHTML = list.length ? '' : tope
+    ? `<div class="empty">No hay equipos de ${esc(S.cat)} con cuotas de hasta ${esc(topeTxt())} por mes. Probá con un monto mayor o revisá otra categoría.</div>`
+    : `<div class="empty">No encontramos equipos para “${esc(S.q)}”. Probá con otro modelo o capacidad.</div>`;
+}
+
+function renderFooter(){
+  const d = S.dolar;
+  const fuente = d.fuente === 'rosario' ? 'la cotización del dólar blue en Rosario (precio de venta, InfoDolar)'
+    : d.fuente === 'blue' ? 'la cotización del dólar blue (precio de venta)' : 'una cotización de referencia';
+  $('#foot').innerHTML = `<h3>Condiciones</h3>
+    <p>Financiación exclusiva con DNI en 3, 6 y 12 cuotas, sujeta a aprobación.</p>
+    <p>Las cuotas se expresan en dólares. El equivalente en pesos es estimado según ${fuente}${d.hora ? ', actualizada a las ' + d.hora + ' hs' : ''}, y se confirma al momento de la operación.</p>
+    <p>Precios y disponibilidad sujetos a cambios sin previo aviso. ${esc(CONFIG.NOMBRE)}, Rosario, Santa Fe.</p>`;
+}
+
+function renderAll(){
+  $('#bar').hidden = false;
+  renderCats(); renderFilters(); renderBudget(); renderList(); renderFooter();
+}
+
+document.addEventListener('click', e => {
+  const cat = e.target.closest('[data-cat]');
+  if (cat){ S.cat = cat.dataset.cat; S.cond = 'Todos'; S.q = ''; renderAll(); return; }
+  const cond = e.target.closest('[data-cond]');
+  if (cond){ S.cond = cond.dataset.cond; renderFilters(); renderList(); return; }
+  const mon = e.target.closest('[data-moneda]');
+  if (mon && mon.dataset.moneda !== S.moneda){
+    // convierte el monto escrito a la otra moneda
+    const v = parseNum(S.tope);
+    if (v > 0){
+      const nv = mon.dataset.moneda === 'ARS' ? Math.round(v * S.dolar.valor / 1000) * 1000 : Math.round(v / S.dolar.valor);
+      S.tope = nv.toLocaleString('es-AR');
+    }
+    S.moneda = mon.dataset.moneda; renderBudget(); renderList(); return;
+  }
+  if (e.target.closest('[data-clear]')){ S.tope = ''; renderBudget(); renderList(); return; }
+  const w = e.target.closest('[data-track]');
+  if (w) track('contacto', w.dataset.track);
+});
+
+/* ============================================================
+   Carga inicial
+   ============================================================ */
+function showLoader(msg){
+  $('#state').innerHTML = `<div class="drop">
+    <p>${msg}</p>
+    <label class="btn" style="display:inline-block">Elegir Excel<input type="file" accept=".xlsx,.xls,.csv" id="file" hidden></label>
+  </div>`;
+  $('#file').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    mostrar(parseWorkbook(XLSX.read(await f.arrayBuffer(), {type:'array'})));
+  });
+}
+
+function mostrar(items){
+  if (!items.length){ showLoader('No se encontraron equipos publicables en la planilla. Revisá que tenga modelo y precio.'); return; }
+  S.items = items; $('#state').innerHTML = ''; renderDolar(); renderActualizado(); renderAll();
+}
+
+async function desdeAppsScript(){
+  const r = await withTimeout(fetch(CONFIG.API_URL), 20000);
+  const j = await r.json();
+  if (!j.items || !j.items.length) throw new Error('sin datos');
+  S.actualizado = j.actualizado;
+  S.dolar = CONFIG.DOLAR_FIJO ? {valor: CONFIG.DOLAR_FIJO, fuente: 'fijo'}
+    : j.dolar && j.dolar.valor ? {valor: j.dolar.valor, fuente: 'rosario', hora: hhmm(j.dolar.t)}
+    : await getDolar();
+  return j.items;
+}
+
+async function desdeExcel(){
+  S.dolar = await getDolar();
+  const r = await fetch(CONFIG.ARCHIVO_EXCEL + '?v=' + Date.now(), {cache:'no-store'});
+  if (!r.ok) throw new Error(r.status);
+  S.actualizado = r.headers.get('Last-Modified');
+  return parseWorkbook(XLSX.read(await r.arrayBuffer(), {type:'array'}));
+}
+
+(async () => {
+  $('#state').innerHTML = '<div class="empty">Cargando equipos…</div>';
+  try{ if (!sessionStorage.getItem('farroyo_visita')){ sessionStorage.setItem('farroyo_visita', '1'); track('visita'); } }catch(e){}
+  let items = null;
+  if (CONFIG.API_URL){ try{ items = await desdeAppsScript(); }catch(e){ console.warn('Apps Script', e); } }
+  if (!items){ try{ items = await desdeExcel(); }catch(e){} }
+  if (!S.dolar) S.dolar = await getDolar();
+  renderDolar();
+  if (items) mostrar(items);
+  else { $('#actualizado').parentElement.hidden = true;
+    showLoader(`No se pudo cargar el stock. Revisá la URL de Apps Script en CONFIG o subí <b>${esc(CONFIG.ARCHIVO_EXCEL)}</b> junto a esta página.`); }
+})();
+
+</script>
+</body>
+</html>
