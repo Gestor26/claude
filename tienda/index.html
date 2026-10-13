@@ -1416,8 +1416,13 @@ function parsearAirPods(rows){var out=[];rows.forEach(function(r){var n=(r[0]||'
   var esPro2 = esPro && !esPro3 && (/\b2(da|nd|°)?\b/.test(nl) || /\bgen\s*2\b/.test(nl) || /segunda/.test(nl) || (esPro && !/\b\d/.test(nl)));
   if(esPro3){ord=100;stk=true;}
   else if(esPro2){ord=90;stk=true;}
+  else if(/\b5(ta|th|°)?\b/.test(nl))ord=85;
   else if(/\b4(ta|th|°)?\b/.test(nl))ord=80;
-  out.push({n:n,usd:usd,sticker:stk,_ord:ord});});return dedup(out,function(x){return x.n+'|'+x.usd;}).sort(function(a,b){return b._ord-a._ord;});}
+  // Etiqueta segun la columna de caracteristica del Excel (col C): "Cancelacion de Sonido" / "Sin cancelacion de Sonido"
+  var carac=(r[2]||'').trim(), cl=carac.toLowerCase();
+  if(/cancel/.test(cl)){ stk = /\bsin\b|\bno\b/.test(cl) ? 'sin' : 'con'; }
+  else if(stk===true) stk='con';
+  out.push({n:n,usd:usd,sticker:stk,_ord:ord,_stk:stk==='con'?1:0});});return dedup(out,function(x){return x.n+'|'+x.usd+'|'+x.sticker;}).sort(function(a,b){return (b._ord-a._ord)||(b._stk-a._stk);});}
 function parsearPencil(rows){var out=[];rows.forEach(function(r){var n=(r[0]||'').trim();if(!n)return;if((r[3]||'').toLowerCase().indexOf('sellado')<0)return;var usd=pxUSD(r[5]);if(!usd)return;var nl=n.toLowerCase(),ord=40;if(nl.indexOf('airtag')>=0&&nl.indexOf('4')>=0)ord=80;else if(nl.indexOf('airtag')>=0)ord=70;else if(nl.indexOf('usb')>=0)ord=60;else if(nl.indexOf('pencil')>=0)ord=50;out.push({n:n,usd:usd,_ord:ord});});return dedup(out,function(x){return x.n+'|'+x.usd;}).sort(function(a,b){return b._ord-a._ord;});}
 
 function parsearPS5(rows){
@@ -1717,7 +1722,7 @@ function buildHTML(prodId,items,parte,total,d){
     if(item.mem)subH='<div style="font-size:'+selSubSize+'px;font-weight:700;color:#1c1917;margin-top:3px;font-family:'+selFont+'">'+item.mem+'</div>';
     var batH=item.rango?'<div style="display:inline-flex;align-items:center;margin-top:6px;padding:4px 14px;border-radius:20px;width:fit-content;background:'+item.bg+'"><span style="font-size:16px;font-weight:700;color:'+item.fg+';font-family:'+selFont+'">&#128267; '+item.rango+'</span></div>':'';
     var obsH=item.obs?'<div style="margin-top:5px;font-size:16px;font-weight:500;color:#6B7280;font-family:'+selFont+';line-height:1.25">'+String(item.obs).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>':'';
-    var stkH=item.sticker?'<div style="margin-top:7px"><span style="display:inline-block;background:#E2E4E8;border-radius:20px;padding:5px 14px;font-size:17px;font-weight:600;color:#4A5060;font-family:'+selFont+'">&#128263; Cancelaci\u00f3n de Sonido</span></div>':'';
+    var stkH=item.sticker?'<div style="margin-top:7px"><span style="display:inline-block;background:'+(item.sticker==='sin'?'#F3F4F6':'#E2E4E8')+';border-radius:20px;padding:5px 14px;font-size:17px;font-weight:600;color:'+(item.sticker==='sin'?'#9CA3AF':'#4A5060')+';font-family:'+selFont+'">'+(item.sticker==='sin'?'&#128264; Sin Cancelaci\u00f3n de Sonido':'&#128263; Cancelaci\u00f3n de Sonido')+'</span></div>':'';
     var sldH=item.sellado?'<div style="display:inline-flex;align-items:center;gap:5px;margin-top:5px"><span style="color:#CC0000;font-size:20px">&#9733;</span><span style="font-size:18px;font-weight:700;color:#CC0000;font-family:'+selFont+';letter-spacing:1px">SELLADO</span></div>':'';
     var pagH='';
     var precioLabel=esPesos?fmtExacto(usd):'$'+usd;
